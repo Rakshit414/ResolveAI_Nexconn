@@ -36,7 +36,7 @@ export default function CustomerPortal({
       avatar: customer.avatar,
     });
 
-    // 1. Immediately sync messages from isolated channel history
+    // 1. Immediately load isolated channel history from nexconnService
     setMessages(nexconnService.getChannelMessages(channelId));
     setInputText('');
 
@@ -194,33 +194,33 @@ export default function CustomerPortal({
     'I would like to speak with a human support agent.',
   ];
 
-  const portalContent = (
+  return (
     <div className="flex flex-col h-full bg-[#0A0A0A] overflow-hidden">
-      {/* Consolidated Single Application Header */}
-      <div className="px-5 py-3.5 bg-[#0D0D0D] border-b border-[#1A1A1A] shrink-0 space-y-2.5">
+      {/* Consolidated Single Header */}
+      <div className="px-6 py-4 bg-[#0D0D0D] border-b border-[#1A1A1A] shrink-0 space-y-3">
         {/* Top Row: Brand & Persona Switcher */}
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center space-x-2.5 min-w-0">
-            <div className="w-6 h-6 rounded-md bg-[#161616] border border-[#262626] flex items-center justify-center text-[#7CFF00] shrink-0">
-              <ShoppingBag className="w-3.5 h-3.5" />
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center space-x-3 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-[#161616] border border-[#262626] flex items-center justify-center text-[#7CFF00] shrink-0 shadow-sm">
+              <ShoppingBag className="w-4 h-4" />
             </div>
             <div className="min-w-0">
               <div className="flex items-center space-x-2">
-                <span className="font-bold text-xs text-[#FFFFFF] tracking-tight">NovaCart Support</span>
-                <span className="px-1.5 py-0.2 rounded text-[10px] font-semibold text-[#8A8A8A] bg-[#161616] border border-[#222222] hidden sm:inline">
+                <span className="font-bold text-sm text-[#FFFFFF] tracking-tight">NovaCart Support</span>
+                <span className="px-2 py-0.5 rounded text-[10px] font-semibold text-[#8A8A8A] bg-[#161616] border border-[#222222] hidden sm:inline">
                   Customer Experience
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Segmented Persona Tabs (Synchronizes globally across entire app) */}
-          <div className="flex items-center space-x-1 bg-[#141414] p-1 rounded-lg border border-[#222222] shrink-0">
+          {/* Persona Switcher Tabs (Synchronizes globally across entire app) */}
+          <div className="flex items-center space-x-1.5 bg-[#141414] p-1 rounded-xl border border-[#222222] shrink-0">
             {DEMO_CUSTOMERS.map((c) => (
               <button
                 key={c.id}
                 onClick={() => onSelectCustomer(c)}
-                className={`px-2.5 py-1 rounded text-xs font-semibold transition-all ${
+                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
                   customer?.id === c.id
                     ? 'bg-[#7CFF00] text-[#090909] shadow-neon-sm font-bold'
                     : 'text-[#8A8A8A] hover:text-[#FFFFFF]'
@@ -233,50 +233,50 @@ export default function CustomerPortal({
           </div>
         </div>
 
-        {/* Integrated Order Strip & Status Bar */}
-        <div className="flex items-center justify-between pt-1 border-t border-[#161616] text-xs">
+        {/* Integrated Order Context Strip & Status Bar */}
+        <div className="flex items-center justify-between pt-1.5 border-t border-[#161616] text-xs">
           <div className="flex items-center space-x-2 min-w-0">
-            <span className="font-mono text-[#7CFF00] text-[11px] font-semibold shrink-0">
+            <span className="font-mono text-[#7CFF00] text-xs font-semibold shrink-0">
               #{customer?.order?.orderId}
             </span>
             <span className="text-[#333333]">·</span>
-            <span className="text-[#A0A0A0] text-xs truncate">
+            <span className="text-[#A0A0A0] text-xs truncate hidden sm:inline">
               {customer?.order?.product}
             </span>
-            <span className="text-[#333333]">·</span>
+            <span className="text-[#333333] hidden sm:inline">·</span>
             <button
               onClick={() => setShowOrderDetails(!showOrderDetails)}
-              className="text-[#8A8A8A] hover:text-[#7CFF00] underline text-[11px] flex items-center space-x-0.5 shrink-0 transition-colors"
+              className="text-[#8A8A8A] hover:text-[#7CFF00] underline text-xs flex items-center space-x-0.5 shrink-0 transition-colors"
             >
-              <span>{showOrderDetails ? 'Hide' : 'Tracking'}</span>
-              {showOrderDetails ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+              <span>{showOrderDetails ? 'Hide tracking' : 'View tracking'}</span>
+              {showOrderDetails ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
             </button>
           </div>
 
           {/* Status Indicator & Action */}
           <div className="flex items-center space-x-2 shrink-0">
-            <span className="text-[11px] text-[#8A8A8A] font-medium mr-1">
+            <span className="text-xs text-[#8A8A8A] font-medium hidden sm:inline mr-1">
               Status: <strong className={ticketStatus === 'Human Requested' ? 'text-[#FF334B]' : 'text-[#7CFF00]'}>{ticketStatus}</strong>
             </span>
 
             {ticketStatus === 'Resolved' ? (
-              <span id="customer-status-badge-resolved" className="text-[10px] text-[#7CFF00] font-semibold px-2 py-0.5 rounded bg-[#7CFF00]/10 border border-[#7CFF00]/40">
+              <span id="customer-status-badge-resolved" className="text-xs text-[#7CFF00] font-semibold px-2.5 py-0.5 rounded-full bg-[#7CFF00]/10 border border-[#7CFF00]/40">
                 Resolved
               </span>
             ) : ticketStatus === 'Human Agent Active' ? (
-              <span id="customer-status-badge-active" className="text-[10px] text-[#FFFFFF] font-semibold px-2 py-0.5 rounded bg-[#161616] border border-[#7CFF00]/40 flex items-center space-x-1">
+              <span id="customer-status-badge-active" className="text-xs text-[#FFFFFF] font-semibold px-2.5 py-0.5 rounded-full bg-[#161616] border border-[#7CFF00]/40 flex items-center space-x-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#7CFF00] shadow-neon-sm" />
                 <span>Sarah Lin Active</span>
               </span>
             ) : ticketStatus === 'Human Requested' ? (
-              <span id="customer-status-badge-requested" className="text-[10px] text-[#FF334B] font-semibold px-2 py-0.5 rounded bg-[#250C10] border border-[#5C151F]">
+              <span id="customer-status-badge-requested" className="text-xs text-[#FF334B] font-semibold px-2.5 py-0.5 rounded-full bg-[#250C10] border border-[#5C151F]">
                 Human Requested
               </span>
             ) : (
               <button
                 id="btn-request-human"
                 onClick={handleRequestHuman}
-                className="flex items-center space-x-1.5 px-2.5 py-1 rounded text-xs font-semibold bg-[#161616] hover:bg-[#202020] text-[#FFFFFF] border border-[#262626] hover:border-[#7CFF00]/50 transition-colors"
+                className="flex items-center space-x-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-[#161616] hover:bg-[#202020] text-[#FFFFFF] border border-[#262626] hover:border-[#7CFF00]/50 transition-colors shadow-sm"
               >
                 <UserCheck className="w-3.5 h-3.5 text-[#7CFF00]" />
                 <span>Request Human</span>
@@ -285,29 +285,29 @@ export default function CustomerPortal({
           </div>
         </div>
 
-        {/* Collapsible Tracking Detail Drawer */}
+        {/* Expandable Tracking Details */}
         {showOrderDetails && (
-          <div className="mt-2 p-2.5 rounded-lg bg-[#141414] border border-[#222222] text-xs text-[#8A8A8A] leading-relaxed animate-fadeIn">
-            <div className="flex items-center justify-between text-[#8A8A8A] mb-1">
-              <span>Status: <strong className="text-[#FFFFFF]">{customer?.order?.status}</strong></span>
+          <div className="p-3 rounded-xl bg-[#141414] border border-[#222222] text-xs text-[#8A8A8A] leading-relaxed animate-fadeIn">
+            <div className="flex items-center justify-between text-[#8A8A8A] mb-1.5">
+              <span>Delivery Status: <strong className="text-[#FFFFFF]">{customer?.order?.status}</strong></span>
               <span>Carrier: <strong className="text-[#FFFFFF]">{customer?.order?.carrier}</strong></span>
             </div>
-            <span className="text-[#555555] block text-[9px] uppercase font-bold">Latest Note</span>
-            <span className="text-[#FFFFFF]">{customer?.order?.trackingStatus}</span>
+            <span className="text-[#555555] block text-[10px] uppercase font-bold">Latest Courier Update</span>
+            <span className="text-[#FFFFFF] text-xs">{customer?.order?.trackingStatus}</span>
           </div>
         )}
       </div>
 
       {/* Spacious Conversation Stream */}
-      <div id="customer-chat-messages" className="flex-1 overflow-y-auto px-5 py-4 space-y-4 bg-[#090909]">
+      <div id="customer-chat-messages" className="flex-1 overflow-y-auto px-6 lg:px-8 py-6 space-y-4 bg-[#090909]">
         {messages.map((msg) => {
           const isMe = msg.senderRole === 'customer' || msg.senderId === customer?.id;
           const isSystem = msg.senderRole === 'system';
 
           if (isSystem) {
             return (
-              <div key={msg.id} className="flex justify-center my-2">
-                <div className="px-3.5 py-1 rounded-full bg-[#141414] border border-[#222222] text-[11px] text-[#8A8A8A]">
+              <div key={msg.id} className="flex justify-center my-3">
+                <div className="px-4 py-1.5 rounded-full bg-[#141414] border border-[#222222] text-xs text-[#8A8A8A] shadow-sm">
                   {msg.text}
                 </div>
               </div>
@@ -319,18 +319,18 @@ export default function CustomerPortal({
               key={msg.id}
               className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
             >
-              <div className="flex items-center space-x-1.5 mb-1 text-[11px] text-[#8A8A8A] px-1">
+              <div className="flex items-center space-x-2 mb-1 px-1.5 text-xs text-[#8A8A8A]">
                 <span className={isMe ? 'text-[#7CFF00] font-semibold' : 'text-[#FFFFFF] font-semibold'}>
                   {isMe ? 'You' : msg.senderName || 'Support Agent'}
                 </span>
                 <span>·</span>
-                <span className="font-mono text-[10px]">
+                <span className="font-mono text-[11px]">
                   {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </span>
               </div>
 
               <div
-                className={`max-w-[78%] rounded-xl px-4 py-2.5 text-sm leading-relaxed ${
+                className={`max-w-[72%] rounded-2xl px-5 py-3 text-[14px] leading-relaxed ${
                   isMe
                     ? 'bg-[#141414] border border-[#7CFF00]/40 text-[#FFFFFF] shadow-sm'
                     : 'bg-[#1A1A1A] border border-[#262626] text-[#FFFFFF]'
@@ -344,14 +344,14 @@ export default function CustomerPortal({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Compact Quick Suggestion Prompts */}
-      <div className="px-4 py-1.5 bg-[#0D0D0D] border-t border-[#181818] flex items-center space-x-2 overflow-x-auto no-scrollbar shrink-0">
-        <span className="text-[10px] text-[#555555] shrink-0 font-bold uppercase">Quick ask:</span>
+      {/* Optional Compact Quick Suggestion Prompts */}
+      <div className="px-6 py-2 bg-[#0D0D0D] border-t border-[#181818] flex items-center space-x-2 overflow-x-auto no-scrollbar shrink-0">
+        <span className="text-[11px] text-[#555555] shrink-0 font-bold uppercase">Quick ask:</span>
         {quickPrompts.map((prompt, i) => (
           <button
             key={i}
             onClick={() => setInputText(prompt)}
-            className="text-[11px] whitespace-nowrap bg-[#141414] hover:bg-[#1E1E1E] text-[#8A8A8A] hover:text-[#FFFFFF] hover:border-[#7CFF00]/40 px-2.5 py-0.5 rounded-full border border-[#222222] transition-colors"
+            className="text-xs whitespace-nowrap bg-[#141414] hover:bg-[#1E1E1E] text-[#8A8A8A] hover:text-[#FFFFFF] hover:border-[#7CFF00]/40 px-3 py-1 rounded-full border border-[#222222] transition-colors"
           >
             {prompt}
           </button>
@@ -359,34 +359,24 @@ export default function CustomerPortal({
       </div>
 
       {/* Fixed Composer at Bottom */}
-      <form onSubmit={handleSendMessage} className="p-3 bg-[#0D0D0D] border-t border-[#1A1A1A] flex items-center space-x-2 shrink-0">
+      <form onSubmit={handleSendMessage} className="p-4 bg-[#0D0D0D] border-t border-[#1A1A1A] flex items-center space-x-3 shrink-0">
         <input
           type="text"
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
           placeholder={ticketStatus === 'Resolved' ? "Inquiry resolved · Type your message to re-open..." : "Type your message..."}
           disabled={isSending}
-          className="flex-1 bg-[#141414] border border-[#222222] focus:border-[#7CFF00] rounded-lg px-4 py-2 text-sm text-[#FFFFFF] placeholder-[#666666] focus:outline-none transition-colors disabled:opacity-50"
+          className="flex-1 bg-[#141414] border border-[#222222] focus:border-[#7CFF00] rounded-xl px-4 py-2.5 text-sm text-[#FFFFFF] placeholder-[#666666] focus:outline-none transition-colors disabled:opacity-50"
         />
         <button
           type="submit"
           disabled={!inputText.trim() || isSending}
-          className="px-4 py-2 rounded-lg bg-[#7CFF00] hover:bg-[#8EFF1F] text-[#090909] text-xs font-bold flex items-center space-x-1.5 transition-all shadow-neon-sm disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+          className="px-5 py-2.5 rounded-xl bg-[#7CFF00] hover:bg-[#8EFF1F] text-[#090909] text-xs font-bold flex items-center space-x-1.5 transition-all shadow-neon-sm disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
         >
           <span>{isSending ? 'Sending...' : 'Send'}</span>
           <Send className="w-3.5 h-3.5" />
         </button>
       </form>
-    </div>
-  );
-
-  if (compact) {
-    return portalContent;
-  }
-
-  return (
-    <div className="w-full h-full rounded-2xl bg-[#0C0C0C] border border-[#1E1E1E] overflow-hidden shadow-2xl flex flex-col">
-      {portalContent}
     </div>
   );
 }

@@ -37,9 +37,9 @@ export default function SplitView({
   };
 
   return (
-    <div className="h-full w-full flex flex-col lg:flex-row gap-3.5 lg:gap-4 overflow-hidden bg-[#090909]">
-      {/* Left Pane: Customer Experience (~38% Width on Desktop) */}
-      <div className="w-full lg:w-[38%] h-full flex flex-col rounded-2xl bg-[#0C0C0C] border border-[#1E1E1E] shadow-2xl overflow-hidden shrink-0 min-w-0">
+    <div className="h-full w-full flex flex-col lg:flex-row gap-4 overflow-hidden bg-[#090909]">
+      {/* Left Pane: Customer Experience (~40% Width on Desktop) */}
+      <div className="w-full lg:w-[40%] h-full flex flex-col rounded-2xl bg-[#0C0C0C] border border-[#1E1E1E] shadow-2xl overflow-hidden shrink-0 min-w-0">
         <CustomerPortal
           customer={activeCustomer}
           onSelectCustomer={handleCustomerChange}
@@ -47,8 +47,8 @@ export default function SplitView({
         />
       </div>
 
-      {/* Right Pane: Agent Workspace (~62% Width on Desktop) */}
-      <div className="w-full lg:w-[62%] h-full flex flex-col rounded-2xl bg-[#0C0C0C] border border-[#1E1E1E] shadow-2xl overflow-hidden min-w-0">
+      {/* Right Pane: Agent Workspace (~60% Width on Desktop) */}
+      <div className="w-full lg:w-[60%] h-full flex flex-col rounded-2xl bg-[#0C0C0C] border border-[#1E1E1E] shadow-2xl overflow-hidden min-w-0 relative">
         <AgentDashboard
           selectedTicketId={activeTicketId}
           onSelectTicketId={handleTicketSelect}

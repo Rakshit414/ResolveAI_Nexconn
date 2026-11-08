@@ -17,7 +17,8 @@ export default function AgentDashboard({
   const [messagesMap, setMessagesMap] = useState({});
   const [activeFilter, setActiveFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
-  const [isCopilotOpen, setIsCopilotOpen] = useState(!isSplitView);
+  // Closed by default, opens as a floating overlay drawer over the conversation workspace
+  const [isCopilotOpen, setIsCopilotOpen] = useState(false);
   const [isInboxCollapsed, setIsInboxCollapsed] = useState(false);
   const [mobileTab, setMobileTab] = useState('chat'); // 'inbox' | 'chat' | 'copilot'
   const [stats, setStats] = useState({
@@ -335,20 +336,20 @@ export default function AgentDashboard({
   return (
     <div className="flex flex-col h-full bg-[#0A0A0A] overflow-hidden">
       {/* Consolidated Single Workspace Header */}
-      <div className="bg-[#0D0D0D] border-b border-[#1A1A1A] px-5 py-3.5 flex items-center justify-between shrink-0 text-xs">
+      <div className="bg-[#0D0D0D] border-b border-[#1A1A1A] px-6 py-4 flex items-center justify-between shrink-0 text-xs">
         <div className="flex items-center space-x-3">
-          <span className="w-2 h-2 rounded-full bg-[#7CFF00] shadow-neon-sm" />
+          <span className="w-2.5 h-2.5 rounded-full bg-[#7CFF00] shadow-neon-sm" />
           <div className="flex items-center space-x-2">
-            <span className="font-bold text-xs text-[#FFFFFF]">Agent Workspace</span>
+            <span className="font-bold text-sm text-[#FFFFFF]">Agent Workspace</span>
             <span className="text-[#8A8A8A] text-xs font-medium hidden sm:inline">({DEMO_AGENT.name})</span>
-            <span className="px-1.5 py-0.2 rounded text-[10px] font-semibold text-[#8A8A8A] bg-[#161616] border border-[#222222] hidden sm:inline">
+            <span className="px-2 py-0.5 rounded text-[10px] font-semibold text-[#8A8A8A] bg-[#161616] border border-[#222222] hidden sm:inline">
               Agent Workspace & AI Copilot
             </span>
           </div>
         </div>
 
         {/* Status Counts & Indicators */}
-        <div className="flex items-center space-x-3 text-xs text-[#8A8A8A]">
+        <div className="hidden sm:flex items-center space-x-3 text-xs text-[#8A8A8A]">
           <span>Queue: <strong className="text-[#FFFFFF]">{stats.total}</strong></span>
           <span>·</span>
           <span>Urgent: <strong className={stats.urgent > 0 ? "text-[#FF334B]" : "text-[#FFFFFF]"}>{stats.urgent}</strong></span>
@@ -363,7 +364,7 @@ export default function AgentDashboard({
       <div className="md:hidden flex items-center border-b border-[#1A1A1A] bg-[#0D0D0D] text-xs shrink-0">
         <button
           onClick={() => setMobileTab('inbox')}
-          className={`flex-1 py-2 text-center font-semibold ${
+          className={`flex-1 py-2.5 text-center font-semibold ${
             mobileTab === 'inbox' ? 'text-[#7CFF00] border-b-2 border-[#7CFF00]' : 'text-[#8A8A8A]'
           }`}
         >
@@ -371,15 +372,18 @@ export default function AgentDashboard({
         </button>
         <button
           onClick={() => setMobileTab('chat')}
-          className={`flex-1 py-2 text-center font-semibold ${
+          className={`flex-1 py-2.5 text-center font-semibold ${
             mobileTab === 'chat' ? 'text-[#7CFF00] border-b-2 border-[#7CFF00]' : 'text-[#8A8A8A]'
           }`}
         >
           Chat
         </button>
         <button
-          onClick={() => setMobileTab('copilot')}
-          className={`flex-1 py-2 text-center font-semibold ${
+          onClick={() => {
+            setMobileTab('copilot');
+            setIsCopilotOpen(true);
+          }}
+          className={`flex-1 py-2.5 text-center font-semibold ${
             mobileTab === 'copilot' ? 'text-[#7CFF00] border-b-2 border-[#7CFF00]' : 'text-[#8A8A8A]'
           }`}
         >
@@ -387,9 +391,9 @@ export default function AgentDashboard({
         </button>
       </div>
 
-      {/* Main SaaS Workspace Body */}
-      <div className="flex-1 flex overflow-hidden min-h-0">
-        {/* Left: Compact / Collapsible Conversation Inbox */}
+      {/* Main SaaS Workspace Body: Exactly TWO permanent columns with Overlay Copilot */}
+      <div className="flex-1 flex overflow-hidden min-h-0 relative">
+        {/* Column 1 (Left): Compact / Collapsible Conversation Inbox */}
         <div className={`shrink-0 h-full ${
           mobileTab === 'inbox' ? 'block w-full' : 'hidden md:block'
         }`}>
@@ -428,7 +432,7 @@ export default function AgentDashboard({
           />
         </div>
 
-        {/* Center: Conversation Workspace (Takes all remaining width, min-w-0) */}
+        {/* Column 2 (Right): Large Full-Width Conversation Workspace (Never Compressed by Copilot!) */}
         <div className={`flex-1 h-full min-w-0 flex flex-col ${
           mobileTab === 'chat' ? 'block' : 'hidden md:flex'
         }`}>
@@ -442,16 +446,16 @@ export default function AgentDashboard({
               onToggleCopilot={() => setIsCopilotOpen(!isCopilotOpen)}
             />
           ) : (
-            <div className="flex-1 flex items-center justify-center p-6 text-[#8A8A8A] text-xs">
+            <div className="flex-1 flex items-center justify-center p-6 text-[#8A8A8A] text-sm">
               Select a conversation to begin.
             </div>
           )}
         </div>
 
-        {/* Right: AI Copilot Drawer (Smoothly Collapsible) */}
-        {isCopilotOpen && selectedTicket && (
-          <div className={`shrink-0 h-full ${
-            mobileTab === 'copilot' ? 'block w-full' : 'hidden md:block'
+        {/* Real Overlay Drawer: Floats over the conversation workspace without resizing it! */}
+        {(isCopilotOpen || mobileTab === 'copilot') && selectedTicket && (
+          <div className={`absolute right-0 top-0 bottom-0 z-30 w-[380px] max-w-[90vw] h-full shadow-2xl animate-in slide-in-from-right duration-200 ${
+            mobileTab === 'copilot' ? 'block w-full max-w-full' : 'hidden md:block'
           }`}>
             <AICopilotPanel
               ticket={selectedTicket}

@@ -34,7 +34,7 @@ export default function App() {
   const [selectedTicketId, setSelectedTicketId] = useState(initialCust.ticket.id);
   const [isPoliciesOpen, setIsPoliciesOpen] = useState(false);
 
-  // Authoritative Customer Selection: Synchronizes both panes & all components
+  // Authoritative Customer Selection: Synchronizes both panes & all views
   const handleSelectCustomer = (customer) => {
     if (!customer) return;
     setCurrentCustomer(customer);
@@ -42,7 +42,7 @@ export default function App() {
     setSelectedTicketId(tId);
   };
 
-  // Authoritative Ticket Selection from Agent Inbox: Synchronizes both panes & all components
+  // Authoritative Ticket Selection from Agent Inbox: Synchronizes both panes & all views
   const handleSelectTicketId = (ticketId) => {
     if (!ticketId) return;
     setSelectedTicketId(ticketId);
@@ -62,15 +62,16 @@ export default function App() {
       />
 
       {/* Main Workspace Canvas with intentional breathing space below navbar */}
-      <main className="flex-1 p-3 md:p-4 overflow-hidden bg-[#090909] min-h-0">
+      <main className="flex-1 p-3 md:p-4 lg:p-5 overflow-hidden bg-[#090909] min-h-0">
         <Routes>
           <Route
             path="/"
             element={
-              <div className="h-full max-w-2xl mx-auto flex flex-col justify-center overflow-hidden">
+              <div className="h-full max-w-5xl w-full mx-auto flex flex-col rounded-2xl bg-[#0C0C0C] border border-[#1E1E1E] shadow-2xl overflow-hidden">
                 <CustomerPortal
                   customer={currentCustomer}
                   onSelectCustomer={handleSelectCustomer}
+                  compact={false}
                 />
               </div>
             }
@@ -78,10 +79,11 @@ export default function App() {
           <Route
             path="/customer"
             element={
-              <div className="h-full max-w-2xl mx-auto flex flex-col justify-center overflow-hidden">
+              <div className="h-full max-w-5xl w-full mx-auto flex flex-col rounded-2xl bg-[#0C0C0C] border border-[#1E1E1E] shadow-2xl overflow-hidden">
                 <CustomerPortal
                   customer={currentCustomer}
                   onSelectCustomer={handleSelectCustomer}
+                  compact={false}
                 />
               </div>
             }
@@ -89,7 +91,7 @@ export default function App() {
           <Route
             path="/agent"
             element={
-              <div className="h-full w-full rounded-2xl bg-[#0E0E0E] border border-[#1E1E1E] overflow-hidden shadow-2xl flex flex-col">
+              <div className="h-full w-full rounded-2xl bg-[#0C0C0C] border border-[#1E1E1E] overflow-hidden shadow-2xl flex flex-col">
                 <AgentDashboard
                   selectedTicketId={selectedTicketId}
                   onSelectTicketId={handleSelectTicketId}

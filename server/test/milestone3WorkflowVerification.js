@@ -151,9 +151,12 @@ async function runMilestone3Verification() {
     const reply1 = `AgentReply-${Date.now()}: Your shipment is on a priority courier vehicle.`;
     await pageAgent.type('form input[type="text"]', reply1);
     await pageAgent.click('form button[type="submit"]');
-    await sleep(4000);
-
-    const aaravGotReply1 = await pageAarav.evaluate(txt => document.body.innerText.includes(txt), reply1);
+    let aaravGotReply1 = false;
+    for (let r = 0; r < 6; r++) {
+      aaravGotReply1 = await pageAarav.evaluate(txt => document.body.innerText.includes(txt), reply1);
+      if (aaravGotReply1) break;
+      await sleep(1000);
+    }
     assert('Scenario 1.3: Customer receives agent response via Nexconn', aaravGotReply1);
 
     // =======================================================================

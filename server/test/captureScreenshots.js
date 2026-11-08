@@ -13,7 +13,7 @@ const CHROME_PATH = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
 const BACKEND_URL = 'http://127.0.0.1:5000';
 const FRONTEND_URL = 'http://127.0.0.1:5173';
 
-const ARTIFACT_DIR = 'C:\\Users\\Rakshit Jain\\.gemini\antigravity\\brain\\4f19604b-ba21-48f5-8507-572a2a9548c7';
+const ARTIFACT_DIR = 'C:/Users/Rakshit Jain/.gemini/antigravity/brain/4f19604b-ba21-48f5-8507-572a2a9548c7';
 const ARTIFACT_SCREENSHOTS = path.join(ARTIFACT_DIR, 'screenshots');
 const LOCAL_SCREENSHOTS = path.join(ROOT_DIR, 'screenshots');
 
@@ -110,9 +110,8 @@ async function main() {
     // 2. Split View (1536 x 864) - Copilot Open
     console.log('\n--- 2. Split View at 1536 x 864 (Copilot Open) ---');
     await page.evaluate(() => {
-      const btns = Array.from(document.querySelectorAll('button'));
-      const copilotBtn = btns.find(b => b.textContent.includes('Copilot'));
-      if (copilotBtn) copilotBtn.click();
+      const btn = document.querySelector('#btn-toggle-copilot');
+      if (btn) btn.click();
     });
     await sleep(1200);
     await takeScreenshot('02_split_view_copilot_open_1536x864.png');
@@ -127,29 +126,27 @@ async function main() {
     // 4. Split View (1440 x 900) - Copilot Open
     console.log('\n--- 4. Split View at 1440 x 900 (Copilot Open) ---');
     await page.evaluate(() => {
-      const btns = Array.from(document.querySelectorAll('button'));
-      const copilotBtn = btns.find(b => b.textContent.includes('Copilot'));
-      if (copilotBtn) copilotBtn.click();
+      const btn = document.querySelector('#btn-toggle-copilot');
+      if (btn) btn.click();
     });
     await sleep(1200);
     await takeScreenshot('04_split_view_copilot_open_1440x900.png');
 
-    // 5. Agent Dashboard (1536 x 864) - Copilot Open (Default in standalone)
-    console.log('\n--- 5. Agent Dashboard at 1536 x 864 (Copilot Open) ---');
+    // 5. Agent Dashboard (1536 x 864) - Copilot Closed
+    console.log('\n--- 5. Agent Dashboard at 1536 x 864 (Copilot Closed) ---');
     await page.setViewport({ width: 1536, height: 864, deviceScaleFactor: 1 });
     await page.goto(`${FRONTEND_URL}/agent`, { waitUntil: 'networkidle0' });
     await sleep(1200);
-    await takeScreenshot('05_agent_dashboard_copilot_open_1536x864.png');
+    await takeScreenshot('06_agent_dashboard_copilot_closed_1536x864.png');
 
-    // 6. Agent Dashboard (1536 x 864) - Copilot Closed (Toggled)
-    console.log('\n--- 6. Agent Dashboard at 1536 x 864 (Copilot Closed) ---');
+    // 6. Agent Dashboard (1536 x 864) - Copilot Open
+    console.log('\n--- 6. Agent Dashboard at 1536 x 864 (Copilot Open) ---');
     await page.evaluate(() => {
-      const btns = Array.from(document.querySelectorAll('button'));
-      const copilotBtn = btns.find(b => b.textContent.includes('Copilot'));
-      if (copilotBtn) copilotBtn.click();
+      const btn = document.querySelector('#btn-toggle-copilot');
+      if (btn) btn.click();
     });
     await sleep(1200);
-    await takeScreenshot('06_agent_dashboard_copilot_closed_1536x864.png');
+    await takeScreenshot('05_agent_dashboard_copilot_open_1536x864.png');
 
     // 7. Customer Portal Desktop (1536 x 864)
     console.log('\n--- 7. Customer Portal Desktop at 1536 x 864 ---');

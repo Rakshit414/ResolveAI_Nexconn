@@ -124,7 +124,7 @@ export default function AICopilotPanel({
   const isUrgent = analysis?.priority?.toLowerCase() === 'critical' || analysis?.priority?.toLowerCase() === 'high';
 
   return (
-    <div className="w-[320px] md:w-[340px] shrink-0 h-full bg-[#0D0D0D] border-l border-[#1A1A1A] flex flex-col overflow-hidden animate-in slide-in-from-right duration-200">
+    <div className="w-full h-full bg-[#0D0D0D] border-l border-[#1A1A1A] flex flex-col overflow-hidden animate-in slide-in-from-right duration-200">
       {/* Drawer Header */}
       <div className="px-4 py-3 border-b border-[#1A1A1A] flex items-center justify-between shrink-0 bg-[#0F0F0F]">
         <div className="flex items-center space-x-2">
@@ -146,6 +146,7 @@ export default function AICopilotPanel({
           </button>
           {onClose && (
             <button
+              id="btn-close-copilot"
               onClick={onClose}
               className="p-1 rounded text-[#8A8A8A] hover:text-[#FFFFFF] transition-colors"
               title="Close Copilot Panel"

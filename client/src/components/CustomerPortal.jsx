@@ -21,26 +21,18 @@ export default function CustomerPortal({ customer, onSelectCustomer, onMessageSe
   useEffect(() => {
     if (!customer) return;
 
+    const channelId = customer.channelId || `channel_${customer.order.orderId}`;
+
     nexconnService.connectUser({
       id: customer.id,
       name: customer.name,
       avatar: customer.avatar,
     });
 
-    const initialMsgs = [
-      {
-        id: `msg_init_${customer.id}`,
-        senderId: customer.id,
-        senderName: customer.name,
-        senderRole: 'customer',
-        senderAvatar: customer.avatar,
-        text: customer.order.initialMessage,
-        timestamp: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
-      }
-    ];
-
-    setMessages(initialMsgs);
+    // 1. Load exact isolated channel history from nexconnService
+    setMessages(nexconnService.getChannelMessages(channelId));
     
+    // 2. Set status
     const isHandoff = customer.ticket.humanRequested || 
       customer.ticket.status === 'Human Requested' || 
       customer.ticket.status === 'Human Assistance Requested';
@@ -55,9 +47,12 @@ export default function CustomerPortal({ customer, onSelectCustomer, onMessageSe
       : 'AI Handling';
     setTicketStatus(initialStatus);
 
-    const unsubscribe = nexconnService.subscribe(`channel_${customer.order.orderId}`, (newMsg) => {
+    // 3. Subscribe ONLY to this customer's persistent channel
+    const unsubscribe = nexconnService.subscribe(channelId, (newMsg) => {
       setMessages((prev) => {
-        if (prev.some((m) => m.id === newMsg.id)) return prev;
+        if (prev.some((m) => m.id === newMsg.id || (m.messageId && m.messageId === newMsg.messageId))) {
+          return prev;
+        }
         return [...prev, newMsg];
       });
 
@@ -66,10 +61,11 @@ export default function CustomerPortal({ customer, onSelectCustomer, onMessageSe
       }
     });
 
+    // Cleanup: unsubscribe when customer changes or component unmounts
     return () => {
       unsubscribe();
     };
-  }, [customer]);
+  }, [customer?.id]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -80,24 +76,24 @@ export default function CustomerPortal({ customer, onSelectCustomer, onMessageSe
     if (!inputText.trim() || isSending) return;
 
     const textToSend = inputText.trim();
+    const channelId = customer.channelId || `channel_${customer.order.orderId}`;
     setInputText('');
     setIsSending(true);
 
     try {
-      const sentMsg = await nexconnService.sendMessage(
-        'agent_sarah',
-        textToSend,
-        {
+      const sentMsg = await nexconnService.sendMessage({
+        targetUserId: 'agent_sarah',
+        channelId,
+        text: textToSend,
+        metadata: {
           orderId: customer.order.orderId,
-          channelId: `channel_${customer.order.orderId}`,
-        }
-      );
+          ticketId: customer.ticket.id,
+        },
+      });
 
       if (sentMsg) {
-        setMessages((prev) => {
-          if (prev.some((m) => m.id === sentMsg.id)) return prev;
-          return [...prev, sentMsg];
-        });
+        // Sync message list from isolated channel store
+        setMessages(nexconnService.getChannelMessages(channelId));
 
         if (onMessageSent) {
           onMessageSent(sentMsg);
@@ -111,14 +107,18 @@ export default function CustomerPortal({ customer, onSelectCustomer, onMessageSe
   };
 
   const handleRequestHuman = async () => {
+    if (humanRequested) return;
     try {
       setHumanRequested(true);
       setTicketStatus('Human Requested');
 
       await requestHumanAssistance(customer.ticket.id);
 
+      const channelId = customer.channelId || `channel_${customer.order.orderId}`;
       const systemNotice = {
-        id: `sys_${Date.now()}`,
+        id: `sys_${channelId}_${Date.now()}`,
+        messageId: `sys_${channelId}_${Date.now()}`,
+        channelId,
         senderId: 'system',
         senderName: 'System',
         senderRole: 'system',
@@ -126,7 +126,8 @@ export default function CustomerPortal({ customer, onSelectCustomer, onMessageSe
         timestamp: new Date().toISOString(),
       };
 
-      setMessages((prev) => [...prev, systemNotice]);
+      nexconnService.dispatchToChannel(channelId, systemNotice);
+      setMessages(nexconnService.getChannelMessages(channelId));
     } catch (err) {
       console.error('Failed to request human assistance:', err);
     }
@@ -298,14 +299,15 @@ export default function CustomerPortal({ customer, onSelectCustomer, onMessageSe
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             placeholder="Type your message..."
-            className="flex-1 bg-[#161616] border border-[#222222] focus:border-[#7CFF00] rounded px-3 py-2 text-xs text-[#FFFFFF] placeholder-[#8A8A8A] focus:outline-none transition-colors"
+            disabled={isSending}
+            className="flex-1 bg-[#161616] border border-[#222222] focus:border-[#7CFF00] rounded px-3 py-2 text-xs text-[#FFFFFF] placeholder-[#8A8A8A] focus:outline-none transition-colors disabled:opacity-50"
           />
           <button
             type="submit"
             disabled={!inputText.trim() || isSending}
             className="px-3.5 py-2 rounded bg-[#7CFF00] hover:bg-[#8EFF1F] text-[#090909] text-xs font-bold flex items-center space-x-1.5 transition-all shadow-neon-sm disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
           >
-            <span>Send</span>
+            <span>{isSending ? 'Sending...' : 'Send'}</span>
             <Send className="w-3.5 h-3.5" />
           </button>
         </form>

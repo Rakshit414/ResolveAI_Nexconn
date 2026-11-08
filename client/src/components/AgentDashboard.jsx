@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { DEMO_CUSTOMERS, DEMO_AGENT } from '../data/demoData';
 import { getTickets, updateTicket } from '../services/api';
 import nexconnService from '../services/nexconnService';
@@ -25,6 +25,9 @@ export default function AgentDashboard({
     resolved: 0,
   });
 
+  const subscriptionsRef = useRef([]);
+
+  // Initialize tickets and agent session
   useEffect(() => {
     nexconnService.connectUser({
       id: DEMO_AGENT.id,
@@ -35,10 +38,12 @@ export default function AgentDashboard({
 
     const initialTickets = DEMO_CUSTOMERS.map((c) => ({
       ...c.ticket,
+      channelId: c.channelId || `channel_${c.order.orderId}`,
       customer: {
         id: c.id,
         name: c.name,
         email: c.email,
+        channelId: c.channelId || `channel_${c.order.orderId}`,
         avatar: c.avatar,
         order: c.order,
       },
@@ -50,27 +55,29 @@ export default function AgentDashboard({
       initialTickets.find(t => t.id === selectedTicketId) || initialTickets[0];
     setSelectedTicket(initialSelected);
 
-    const msgMap = {};
+    // Initial message history loaded from nexconnService (isolated by channel)
+    const initialMap = {};
     initialTickets.forEach((t) => {
-      msgMap[t.id] = [
-        {
-          id: `init_msg_${t.id}`,
-          senderId: t.customer.id,
-          senderName: t.customer.name,
-          senderRole: 'customer',
-          senderAvatar: t.customer.avatar,
-          text: t.customer.order.initialMessage,
-          timestamp: new Date(Date.now() - 1000 * 60 * 10).toISOString(),
-        },
-      ];
+      const channelId = t.channelId || `channel_${t.orderId}`;
+      initialMap[t.id] = nexconnService.getChannelMessages(channelId);
     });
-    setMessagesMap(msgMap);
+    setMessagesMap(initialMap);
+
+    // Subscribe to each channel's events independently and store cleanup handlers
+    // Clean up any existing listeners first
+    subscriptionsRef.current.forEach((unsub) => unsub());
+    subscriptionsRef.current = [];
 
     initialTickets.forEach((t) => {
-      nexconnService.subscribe(`channel_${t.orderId}`, (newMsg) => {
+      const channelId = t.channelId || `channel_${t.orderId}`;
+      const unsub = nexconnService.subscribe(channelId, (newMsg) => {
+        // When a message arrives on this channel, update only this ticket's messages
         setMessagesMap((prev) => {
           const currentList = prev[t.id] || [];
-          if (currentList.some((m) => m.id === newMsg.id)) return prev;
+          // Deduplicate by message ID
+          if (currentList.some((m) => m.id === newMsg.id || (m.messageId && m.messageId === newMsg.messageId))) {
+            return prev;
+          }
           return {
             ...prev,
             [t.id]: [...currentList, newMsg],
@@ -87,16 +94,32 @@ export default function AgentDashboard({
           );
         }
       });
+      subscriptionsRef.current.push(unsub);
     });
+
+    return () => {
+      subscriptionsRef.current.forEach((unsub) => unsub());
+      subscriptionsRef.current = [];
+    };
   }, []);
 
+  // Sync selectedTicket when prop changes
   useEffect(() => {
     if (selectedTicketId && tickets.length > 0) {
       const match = tickets.find((t) => t.id === selectedTicketId);
-      if (match) setSelectedTicket(match);
+      if (match) {
+        setSelectedTicket(match);
+        // Ensure this ticket's messages are fresh from channel store
+        const channelId = match.channelId || `channel_${match.orderId}`;
+        setMessagesMap((prev) => ({
+          ...prev,
+          [match.id]: nexconnService.getChannelMessages(channelId),
+        }));
+      }
     }
   }, [selectedTicketId, tickets]);
 
+  // Compute metrics
   useEffect(() => {
     const urgentCount = tickets.filter(
       (t) => t.priority === 'Critical' || t.priority === 'High'
@@ -134,23 +157,29 @@ export default function AgentDashboard({
     return true;
   });
 
+  // Handle agent sending a reply
   const handleSendMessage = async (text) => {
-    if (!selectedTicket || !text.trim()) return;
+    if (!selectedTicket || !text || !text.trim()) return;
+
+    const channelId = selectedTicket.channelId || `channel_${selectedTicket.orderId}`;
+    const targetUserId = selectedTicket.customer?.id;
 
     try {
-      const sentMsg = await nexconnService.sendMessage(
-        selectedTicket.customer.id,
+      const sentMsg = await nexconnService.sendMessage({
+        targetUserId,
+        channelId,
         text,
-        {
+        metadata: {
           orderId: selectedTicket.orderId,
-          channelId: `channel_${selectedTicket.orderId}`,
-        }
-      );
+          ticketId: selectedTicket.id,
+        },
+      });
 
       if (sentMsg) {
+        // Sync message map from the canonical channel history (prevents duplicate insertion)
         setMessagesMap((prev) => ({
           ...prev,
-          [selectedTicket.id]: [...(prev[selectedTicket.id] || []), sentMsg],
+          [selectedTicket.id]: nexconnService.getChannelMessages(channelId),
         }));
 
         if (selectedTicket.status !== 'Human Agent Active' && selectedTicket.status !== 'Resolved') {
@@ -249,6 +278,12 @@ export default function AgentDashboard({
             onSelectTicket={(t) => {
               setSelectedTicket(t);
               if (onSelectTicketId) onSelectTicketId(t.id);
+              // Fresh load of messages for this ticket from channel store
+              const channelId = t.channelId || `channel_${t.orderId}`;
+              setMessagesMap((prev) => ({
+                ...prev,
+                [t.id]: nexconnService.getChannelMessages(channelId),
+              }));
               setMobileTab('chat');
             }}
             activeFilter={activeFilter}
@@ -265,7 +300,7 @@ export default function AgentDashboard({
           {selectedTicket ? (
             <ChatWindow
               ticket={selectedTicket}
-              messages={messagesMap[selectedTicket.id] || []}
+              messages={messagesMap[selectedTicket.id] || nexconnService.getChannelMessages(selectedTicket.channelId || `channel_${selectedTicket.orderId}`)}
               onSendMessage={handleSendMessage}
               onUpdateStatus={handleUpdateStatus}
               isCopilotOpen={isCopilotOpen}
@@ -285,7 +320,7 @@ export default function AgentDashboard({
           }`}>
             <AICopilotPanel
               ticket={selectedTicket}
-              messages={messagesMap[selectedTicket.id] || []}
+              messages={messagesMap[selectedTicket.id] || nexconnService.getChannelMessages(selectedTicket.channelId || `channel_${selectedTicket.orderId}`)}
               onApproveAndSend={handleSendMessage}
               onClose={() => setIsCopilotOpen(false)}
             />

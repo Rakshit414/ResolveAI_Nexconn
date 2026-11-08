@@ -50,9 +50,11 @@ export const DEMO_CUSTOMERS = [
     id: "cust_aarav",
     name: "Aarav Sharma",
     email: "aarav.sharma@example.com",
+    channelId: "channel_NC1021",
     avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80",
     order: {
       orderId: "NC1021",
+      channelId: "channel_NC1021",
       product: "Running Shoes (NovaSprint Pro - Blue/Grey)",
       price: 119.99,
       status: "Delayed",
@@ -67,6 +69,8 @@ export const DEMO_CUSTOMERS = [
     ticket: {
       id: "tkt_1021",
       orderId: "NC1021",
+      channelId: "channel_NC1021",
+      customerId: "cust_aarav",
       category: "Delivery Delay",
       priority: "High",
       sentiment: "Frustrated",
@@ -82,9 +86,11 @@ export const DEMO_CUSTOMERS = [
     id: "cust_priya",
     name: "Priya Mehta",
     email: "priya.mehta@example.com",
+    channelId: "channel_NC1022",
     avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80",
     order: {
       orderId: "NC1022",
+      channelId: "channel_NC1022",
       product: "Smartwatch (NovaPulse Smartwatch - Obsidian)",
       price: 249.50,
       status: "Delivered",
@@ -99,6 +105,8 @@ export const DEMO_CUSTOMERS = [
     ticket: {
       id: "tkt_1022",
       orderId: "NC1022",
+      channelId: "channel_NC1022",
+      customerId: "cust_priya",
       category: "Refund Request",
       priority: "Medium",
       sentiment: "Neutral",
@@ -114,9 +122,11 @@ export const DEMO_CUSTOMERS = [
     id: "cust_kabir",
     name: "Kabir Verma",
     email: "kabir.verma@example.com",
+    channelId: "channel_NC1023",
     avatar: "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=150&q=80",
     order: {
       orderId: "NC1023",
+      channelId: "channel_NC1023",
       product: "Wireless Headphones (NovaBass ANC - Matte Black)",
       price: 89.00,
       status: "Delivered",
@@ -131,6 +141,8 @@ export const DEMO_CUSTOMERS = [
     ticket: {
       id: "tkt_1023",
       orderId: "NC1023",
+      channelId: "channel_NC1023",
+      customerId: "cust_kabir",
       category: "Wrong Product",
       priority: "Critical",
       sentiment: "Negative",

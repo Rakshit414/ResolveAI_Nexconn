@@ -22,6 +22,7 @@ export default function AICopilotPanel({
   const [suggestedReply, setSuggestedReply] = useState('');
   const [isEditingReply, setIsEditingReply] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSending, setIsSending] = useState(false);
   const [showFullAnalysis, setShowFullAnalysis] = useState(false);
   const [policyRefs, setPolicyRefs] = useState([]);
 
@@ -96,9 +97,14 @@ export default function AICopilotPanel({
     }
   };
 
-  const handleSendReply = () => {
-    if (!suggestedReply.trim()) return;
-    onApproveAndSend(suggestedReply.trim());
+  const handleSendReply = async () => {
+    if (!suggestedReply.trim() || isSending || isLoading) return;
+    setIsSending(true);
+    try {
+      await onApproveAndSend(suggestedReply.trim());
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const isUrgent = analysis?.priority?.toLowerCase() === 'critical' || analysis?.priority?.toLowerCase() === 'high';
@@ -207,14 +213,14 @@ export default function AICopilotPanel({
             </div>
           )}
 
-          {/* Send Reply Action Button */}
+          {/* Send Reply Action Button with Double-Click Protection */}
           <button
             onClick={handleSendReply}
-            disabled={!suggestedReply.trim() || isLoading}
+            disabled={!suggestedReply.trim() || isLoading || isSending}
             className="w-full py-2 px-3 rounded bg-[#7CFF00] hover:bg-[#8EFF1F] text-[#090909] text-xs font-bold flex items-center justify-center space-x-1.5 transition-all shadow-neon-sm disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Send className="w-3.5 h-3.5" />
-            <span>Send Reply</span>
+            <span>{isSending ? 'Sending...' : 'Send Reply'}</span>
           </button>
         </div>
 

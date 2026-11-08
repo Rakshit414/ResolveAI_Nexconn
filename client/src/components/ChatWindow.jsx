@@ -18,6 +18,7 @@ export default function ChatWindow({
   onToggleCopilot,
 }) {
   const [inputText, setInputText] = useState('');
+  const [isSending, setIsSending] = useState(false);
   const [showOrderDetails, setShowOrderDetails] = useState(false);
   const messagesEndRef = useRef(null);
 
@@ -25,11 +26,17 @@ export default function ChatWindow({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleSend = (e) => {
+  const handleSend = async (e) => {
     e?.preventDefault();
-    if (!inputText.trim()) return;
-    onSendMessage(inputText.trim());
+    if (!inputText.trim() || isSending) return;
+    const textToSend = inputText.trim();
     setInputText('');
+    setIsSending(true);
+    try {
+      await onSendMessage(textToSend);
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const customer = ticket?.customer;
@@ -210,14 +217,15 @@ export default function ChatWindow({
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
           placeholder={`Reply to ${customer?.name || 'customer'}...`}
-          className="flex-1 bg-[#161616] border border-[#222222] focus:border-[#7CFF00] rounded px-3.5 py-2 text-xs text-[#FFFFFF] placeholder-[#8A8A8A] focus:outline-none transition-colors"
+          disabled={isSending}
+          className="flex-1 bg-[#161616] border border-[#222222] focus:border-[#7CFF00] rounded px-3.5 py-2 text-xs text-[#FFFFFF] placeholder-[#8A8A8A] focus:outline-none transition-colors disabled:opacity-50"
         />
         <button
           type="submit"
-          disabled={!inputText.trim()}
+          disabled={!inputText.trim() || isSending}
           className="px-4 py-2 rounded bg-[#7CFF00] hover:bg-[#8EFF1F] text-[#090909] text-xs font-bold flex items-center space-x-1.5 transition-all shadow-neon-sm disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
         >
-          <span>Send</span>
+          <span>{isSending ? 'Sending...' : 'Send'}</span>
           <Send className="w-3.5 h-3.5" />
         </button>
       </form>

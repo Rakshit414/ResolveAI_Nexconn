@@ -1,15 +1,86 @@
 import { NCEngine } from '@nexconn/chat';
-import { getNexconnToken, getNexconnStatus } from './api';
+import { getNexconnToken, getNexconnStatus } from './api.js';
+import { DEMO_CUSTOMERS } from '../data/demoData.js';
 
+/**
+ * Robust Nexconn Messaging Manager
+ * Enforces strict channel isolation, persistent message history,
+ * deduplication, and single-channel event dispatching.
+ */
 class NexconnManager {
   constructor() {
     this.initialized = false;
     this.connected = false;
     this.currentUser = null;
     this.appKey = null;
-    this.handlers = new Set();
-    this.messageSubscribers = new Map(); // channelId -> Set of callbacks
-    this.directChannels = new Map(); // targetUserId -> channel instance
+    this.token = null;
+
+    // Strict channel-specific subscriber map: channelId -> Set<callback>
+    this.channelSubscribers = new Map();
+
+    // Persistent in-memory channel message history: channelId -> Message[]
+    this.channelHistory = new Map();
+
+    // Set of seen message IDs to guarantee absolute deduplication
+    this.seenMessageIds = new Set();
+
+    // Map of active Nexconn DirectChannel instances: targetUserId -> DirectChannel instance
+    this.directChannels = new Map();
+
+    // Guard against rapid duplicate submissions
+    this.inFlightSends = new Set();
+
+    // Initialize seed message history for demo channels
+    this.initializeSeedHistory();
+  }
+
+  /**
+   * Seed initial conversation history per channel
+   */
+  initializeSeedHistory() {
+    DEMO_CUSTOMERS.forEach((c) => {
+      const channelId = c.channelId || `channel_${c.order.orderId}`;
+      const initialMsgId = `msg_seed_${c.id}_${c.order.orderId}`;
+      
+      const seedMsg = {
+        id: initialMsgId,
+        messageId: initialMsgId,
+        channelId,
+        senderId: c.id,
+        senderName: c.name,
+        senderRole: 'customer',
+        senderAvatar: c.avatar,
+        targetUserId: 'agent_sarah',
+        text: c.order.initialMessage,
+        timestamp: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
+        orderId: c.order.orderId,
+      };
+
+      this.seenMessageIds.add(initialMsgId);
+      this.channelHistory.set(channelId, [seedMsg]);
+    });
+  }
+
+  /**
+   * Helper to map ticket/customer/order to canonical persistent channel ID
+   */
+  getChannelId({ ticketId, customerId, orderId, channelId }) {
+    if (channelId) return channelId;
+
+    // Explicit mappings for demo data
+    if (ticketId === 'tkt_1021' || customerId === 'cust_aarav' || orderId === 'NC1021') {
+      return 'channel_NC1021';
+    }
+    if (ticketId === 'tkt_1022' || customerId === 'cust_priya' || orderId === 'NC1022') {
+      return 'channel_NC1022';
+    }
+    if (ticketId === 'tkt_1023' || customerId === 'cust_kabir' || orderId === 'NC1023') {
+      return 'channel_NC1023';
+    }
+
+    if (orderId) return `channel_${orderId}`;
+    if (customerId) return `channel_${customerId}`;
+    return 'channel_default';
   }
 
   /**
@@ -29,7 +100,7 @@ class NexconnManager {
       }
 
       if (!appKey) {
-        console.warn('[Nexconn] No App Key available. Waiting for configuration.');
+        console.warn('[Nexconn] No App Key configured yet.');
         return false;
       }
 
@@ -37,11 +108,11 @@ class NexconnManager {
       if (NCEngine && typeof NCEngine.initialize === 'function') {
         await NCEngine.initialize({ appKey });
         this.initialized = true;
-        console.log('[Nexconn] Engine successfully initialized with App Key:', appKey.substring(0, 5) + '...');
+        console.log('[Nexconn] Engine initialized with App Key');
         return true;
       }
     } catch (err) {
-      console.warn('[Nexconn] Initialization note:', err.message || err);
+      console.warn('[Nexconn] Initialization warning:', err.message || err);
     }
     return false;
   }
@@ -53,7 +124,6 @@ class NexconnManager {
     this.currentUser = user;
 
     try {
-      // 1. Fetch user token from backend
       const tokenRes = await getNexconnToken({
         userId: user.id,
         name: user.name,
@@ -61,37 +131,32 @@ class NexconnManager {
       });
 
       if (!tokenRes.configured) {
-        console.log('[Nexconn] Demo user connection active (backend credentials pending):', user.name);
         this.connected = true;
         return { connected: true, liveNetwork: false, user };
       }
 
-      // 2. Initialize engine if not already done
       if (!this.initialized && tokenRes.appKey) {
         await this.initialize(tokenRes.appKey);
       }
 
-      // 3. Connect to Nexconn Engine
       if (NCEngine && typeof NCEngine.connect === 'function' && tokenRes.token) {
-        // Register global message handler if not already done
         this.registerGlobalHandler();
-
         await NCEngine.connect({ token: tokenRes.token });
         this.connected = true;
-        console.log('[Nexconn] User connected to live network:', user.name);
+        this.token = tokenRes.token;
+        console.log('[Nexconn] Connected user to network:', user.name);
         return { connected: true, liveNetwork: true, user, token: tokenRes.token };
       }
     } catch (err) {
       console.error('[Nexconn] Connection error:', err);
     }
 
-    // Fallback connection state
     this.connected = true;
     return { connected: true, liveNetwork: false, user };
   }
 
   /**
-   * Register incoming message handler with NCEngine
+   * Global message listener registration with NCEngine
    */
   registerGlobalHandler() {
     const handlerId = 'resolve-ai-message-listener';
@@ -99,96 +164,179 @@ class NexconnManager {
       if (NCEngine && typeof NCEngine.addMessageHandler === 'function') {
         NCEngine.addMessageHandler(handlerId, {
           onMessageReceived: (event) => {
-            console.log('[Nexconn] Real-time message received:', event);
-            const msg = event?.message || event;
-            this.broadcastMessage(msg);
+            const rawMsg = event?.message || event;
+            if (!rawMsg) return;
+
+            // Extract channel identifier
+            const targetChannel = rawMsg.channelId || 
+              (rawMsg.metadata?.channelId) || 
+              (rawMsg.orderId ? `channel_${rawMsg.orderId}` : null);
+
+            if (targetChannel) {
+              this.dispatchToChannel(targetChannel, rawMsg);
+            }
           },
           onOfflineMessageSyncCompleted: () => {
-            console.log('[Nexconn] Offline message synchronization completed');
+            console.log('[Nexconn] Offline message sync complete');
           },
         });
       }
     } catch (err) {
-      console.warn('[Nexconn] addMessageHandler note:', err.message);
+      console.warn('[Nexconn] addMessageHandler warning:', err.message);
     }
   }
 
   /**
-   * Broadcast message to local channel subscribers
+   * Get all messages for a specific channel (isolated)
    */
-  broadcastMessage(message) {
-    this.messageSubscribers.forEach((callbacks) => {
+  getChannelMessages(channelId) {
+    if (!channelId) return [];
+    if (!this.channelHistory.has(channelId)) {
+      this.channelHistory.set(channelId, []);
+    }
+    return [...this.channelHistory.get(channelId)];
+  }
+
+  /**
+   * Dispatch a message to subscribers of ONLY the specified channel.
+   * Guarantees that no message leaks into any other channel!
+   */
+  dispatchToChannel(channelId, message) {
+    if (!channelId || !message) return;
+
+    // Deduplicate by message ID
+    const msgId = message.id || message.messageId;
+    if (msgId && this.seenMessageIds.has(msgId)) {
+      return; // Already processed, ignore duplicate
+    }
+
+    if (msgId) {
+      this.seenMessageIds.add(msgId);
+    }
+
+    // Append to isolated channel history
+    if (!this.channelHistory.has(channelId)) {
+      this.channelHistory.set(channelId, []);
+    }
+    const currentList = this.channelHistory.get(channelId);
+    currentList.push(message);
+
+    // Call ONLY callbacks subscribed to this exact channelId
+    const callbacks = this.channelSubscribers.get(channelId);
+    if (callbacks && callbacks.size > 0) {
       callbacks.forEach((cb) => {
         try {
           cb(message);
         } catch (e) {
-          console.error('[Nexconn] Subscriber callback error:', e);
+          console.error('[Nexconn] Channel callback error:', e);
         }
       });
-    });
+    }
   }
 
   /**
-   * Subscribe to messages for a given channel or conversation
+   * Subscribe to messages on a specific channel ONLY
    */
   subscribe(channelId, callback) {
-    if (!this.messageSubscribers.has(channelId)) {
-      this.messageSubscribers.set(channelId, new Set());
+    if (!channelId || typeof callback !== 'function') {
+      return () => {};
     }
-    this.messageSubscribers.get(channelId).add(callback);
 
-    // Return unsubscribe function
+    if (!this.channelSubscribers.has(channelId)) {
+      this.channelSubscribers.set(channelId, new Set());
+    }
+    this.channelSubscribers.get(channelId).add(callback);
+
+    // Return cleanup function to remove this exact listener
     return () => {
-      const subs = this.messageSubscribers.get(channelId);
+      const subs = this.channelSubscribers.get(channelId);
       if (subs) {
         subs.delete(callback);
+        if (subs.size === 0) {
+          this.channelSubscribers.delete(channelId);
+        }
       }
     };
   }
 
   /**
-   * Send a text message via Nexconn DirectChannel
+   * Send a message through a specific channel to a target user
+   * Guarantees:
+   * 1. In-flight double submission prevention.
+   * 2. Message sent ONLY to the specified channel.
+   * 3. Message recorded in channel history exactly once.
+   * 4. Dispatched ONLY to that channel's subscribers.
    */
-  async sendMessage(targetUserId, text, metadata = {}) {
-    if (!text || !text.trim()) return null;
-
-    const messagePayload = {
-      id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
-      senderId: this.currentUser?.id || 'anonymous',
-      senderName: this.currentUser?.name || 'Customer',
-      senderRole: this.currentUser?.role ? 'agent' : 'customer',
-      senderAvatar: this.currentUser?.avatar,
-      targetUserId,
-      text: text.trim(),
-      timestamp: new Date().toISOString(),
-      metadata,
-    };
-
-    // If live NCEngine is connected and has DirectChannel capability
-    try {
-      // Try using Nexconn SDK direct channel if available
-      const DirectChannelClass = window?.DirectChannel || NCEngine?.DirectChannel;
-      if (DirectChannelClass) {
-        let channel = this.directChannels.get(targetUserId);
-        if (!channel) {
-          channel = new DirectChannelClass(targetUserId);
-          this.directChannels.set(targetUserId, channel);
-        }
-
-        if (channel && typeof channel.sendMessage === 'function') {
-          await channel.sendMessage({
-            messageParams: { text: text.trim() },
-          });
-        }
-      }
-    } catch (sdkErr) {
-      console.log('[Nexconn] SDK channel dispatch:', sdkErr.message);
+  async sendMessage({ targetUserId, channelId, text, metadata = {} }) {
+    if (!text || !text.trim() || !channelId) {
+      console.warn('[Nexconn] Missing required params for sendMessage:', { channelId, text });
+      return null;
     }
 
-    // Notify local subscribers
-    this.broadcastMessage(messagePayload);
+    const trimmedText = text.trim();
+    const flightKey = `${channelId}_${targetUserId}_${trimmedText}`;
 
-    return messagePayload;
+    // Prevent rapid duplicate clicks on the exact same message
+    if (this.inFlightSends.has(flightKey)) {
+      console.warn('[Nexconn] Duplicate send rejected (in-flight):', flightKey);
+      return null;
+    }
+
+    this.inFlightSends.add(flightKey);
+
+    try {
+      // Deterministic unique message ID
+      const timestamp = new Date().toISOString();
+      const uniqueSuffix = Math.random().toString(36).substring(2, 8);
+      const messageId = `msg_${channelId}_${Date.now()}_${uniqueSuffix}`;
+
+      const messagePayload = {
+        id: messageId,
+        messageId,
+        channelId,
+        senderId: this.currentUser?.id || 'anonymous',
+        senderName: this.currentUser?.name || (this.currentUser?.role === 'agent' ? 'Sarah Lin' : 'Customer'),
+        senderRole: this.currentUser?.role ? 'agent' : 'customer',
+        senderAvatar: this.currentUser?.avatar,
+        targetUserId,
+        text: trimmedText,
+        timestamp,
+        metadata: {
+          ...metadata,
+          channelId,
+        },
+      };
+
+      // Attempt live Nexconn SDK DirectChannel transmission if available
+      try {
+        const DirectChannelClass = (typeof window !== 'undefined' && window.DirectChannel) || NCEngine?.DirectChannel;
+        if (DirectChannelClass && targetUserId) {
+          let channel = this.directChannels.get(targetUserId);
+          if (!channel) {
+            channel = new DirectChannelClass(targetUserId);
+            this.directChannels.set(targetUserId, channel);
+          }
+
+          if (channel && typeof channel.sendMessage === 'function') {
+            await channel.sendMessage({
+              messageParams: { text: trimmedText },
+            });
+          }
+        }
+      } catch (sdkErr) {
+        console.log('[Nexconn] SDK DirectChannel dispatch note:', sdkErr.message);
+      }
+
+      // Dispatch to this channel ONLY (records in history & notifies only this channel's listeners)
+      this.dispatchToChannel(channelId, messagePayload);
+
+      return messagePayload;
+    } finally {
+      // Release in-flight lock after brief cooldown
+      setTimeout(() => {
+        this.inFlightSends.delete(flightKey);
+      }, 400);
+    }
   }
 
   /**

@@ -9,7 +9,12 @@ import { DEMO_CUSTOMERS } from '../data/demoData';
 import { requestHumanAssistance, getTicket } from '../services/api';
 import nexconnService from '../services/nexconnService';
 
-export default function CustomerPortal({ customer, onSelectCustomer, onMessageSent }) {
+export default function CustomerPortal({ 
+  customer, 
+  onSelectCustomer, 
+  onMessageSent,
+  compact = false 
+}) {
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -123,9 +128,7 @@ export default function CustomerPortal({ customer, onSelectCustomer, onMessageSe
       });
 
       if (sentMsg) {
-        // Sync message list from isolated channel store
         setMessages(nexconnService.getChannelMessages(channelId));
-
         if (onMessageSent) {
           onMessageSent(sentMsg);
         }
@@ -166,7 +169,6 @@ export default function CustomerPortal({ customer, onSelectCustomer, onMessageSe
         },
       };
 
-      // Broadcast over real Nexconn connection to Agent Sarah
       await nexconnService.sendMessage({
         targetUserId: 'agent_sarah',
         channelId,
@@ -191,26 +193,30 @@ export default function CustomerPortal({ customer, onSelectCustomer, onMessageSe
     'I would like to speak with a human support agent.',
   ];
 
-  return (
-    <div className="max-w-3xl mx-auto p-4 md:p-6 space-y-3">
-      {/* Top Customer & Order Summary Card */}
-      <div className="bg-[#0E0E0E] border border-[#222222] rounded p-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <div className="flex items-center space-x-2">
-              <span className="font-bold text-sm text-[#FFFFFF]">NovaCart Support</span>
-              <span className="text-[10px] text-[#7CFF00] font-mono">Order {customer?.order?.orderId}</span>
+  // Render Inner Content
+  const portalContent = (
+    <div className="flex flex-col h-full bg-[#090909] overflow-hidden">
+      {/* Top Header & Switcher */}
+      <div className="px-4 py-2.5 bg-[#0E0E0E] border-b border-[#1E1E1E] shrink-0">
+        <div className="flex items-center justify-between gap-2">
+          {/* Brand & Customer Context */}
+          <div className="flex items-center space-x-2 min-w-0">
+            <span className="w-2 h-2 rounded-full bg-[#7CFF00] shadow-neon-sm shrink-0" />
+            <div className="min-w-0">
+              <div className="flex items-center space-x-1.5">
+                <span className="font-bold text-xs text-[#FFFFFF] truncate">NovaCart Support</span>
+                <span className="text-[10px] text-[#7CFF00] font-mono shrink-0">#{customer?.order?.orderId}</span>
+              </div>
             </div>
-            <p className="text-xs text-[#8A8A8A] mt-0.5">{customer?.order?.product}</p>
           </div>
 
-          {/* Customer switch tabs */}
-          <div className="flex items-center space-x-1.5 bg-[#161616] p-1 rounded border border-[#222222]">
+          {/* Persona Switcher Tabs */}
+          <div className="flex items-center space-x-1 bg-[#141414] p-0.5 rounded border border-[#222222] shrink-0">
             {DEMO_CUSTOMERS.map((c) => (
               <button
                 key={c.id}
                 onClick={() => onSelectCustomer(c)}
-                className={`px-2.5 py-1 rounded text-xs font-semibold transition-all ${
+                className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-all ${
                   customer?.id === c.id
                     ? 'bg-[#7CFF00] text-[#090909] shadow-neon-sm'
                     : 'text-[#8A8A8A] hover:text-[#FFFFFF]'
@@ -222,158 +228,156 @@ export default function CustomerPortal({ customer, onSelectCustomer, onMessageSe
           </div>
         </div>
 
-        {/* Collapsible Order Information */}
-        <div className="mt-3 pt-3 border-t border-[#1C1C1C] flex items-center justify-between text-xs text-[#8A8A8A]">
-          <div className="flex items-center space-x-3">
-            <span>Status: <strong className="text-[#FFFFFF]">{customer?.order?.status}</strong></span>
-            <span>·</span>
-            <span>Carrier: <strong className="text-[#FFFFFF]">{customer?.order?.carrier}</strong></span>
+        {/* Order Strip & Status Bar */}
+        <div className="mt-2 pt-2 border-t border-[#1C1C1C] flex items-center justify-between text-xs text-[#8A8A8A]">
+          <div className="flex items-center space-x-2 truncate">
+            <span className="text-[#8A8A8A] text-[11px] truncate">
+              {customer?.order?.product}
+            </span>
+            <span className="text-[#444444]">·</span>
+            <button
+              onClick={() => setShowOrderDetails(!showOrderDetails)}
+              className="text-[#8A8A8A] hover:text-[#7CFF00] underline text-[11px] flex items-center space-x-0.5 shrink-0 transition-colors"
+            >
+              <span>{showOrderDetails ? 'Hide' : 'Tracking'}</span>
+              {showOrderDetails ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+            </button>
           </div>
 
-          <button
-            onClick={() => setShowOrderDetails(!showOrderDetails)}
-            className="text-[#8A8A8A] hover:text-[#7CFF00] underline flex items-center space-x-1 transition-colors"
-          >
-            <span>{showOrderDetails ? 'Less info' : 'View tracking info'}</span>
-            {showOrderDetails ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-          </button>
-        </div>
-
-        {showOrderDetails && (
-          <div className="mt-2.5 p-2.5 rounded bg-[#161616] border border-[#222222] text-xs text-[#8A8A8A] leading-relaxed">
-            <span className="text-[#555555] block text-[10px] uppercase font-bold">Latest Tracking Note</span>
-            <span className="text-[#FFFFFF]">{customer?.order?.trackingStatus}</span>
-          </div>
-        )}
-      </div>
-
-      {/* Main Support Chat Interface */}
-      <div className="bg-[#0E0E0E] border border-[#222222] rounded overflow-hidden flex flex-col h-[520px]">
-        {/* Support Chat Header */}
-        <div className="px-4 py-2.5 bg-[#0E0E0E] border-b border-[#222222] flex items-center justify-between">
-          <div className="flex items-center space-x-2.5">
-            <span className="w-2 h-2 rounded-full bg-[#7CFF00] shadow-neon-sm" />
-            <span className="font-semibold text-xs text-[#FFFFFF]">Customer Care Desk</span>
-          </div>
-
-          <div className="flex items-center space-x-3">
-            {/* Clean Status Display */}
-            <span className="text-xs text-[#8A8A8A] flex items-center space-x-1">
-              <span>Status:</span>
-              <strong className={
-                ticketStatus === 'Human Requested' ? 'text-[#FF334B]' : 'text-[#7CFF00]'
-              }>
-                {ticketStatus}
-              </strong>
+          {/* Status Badge & Request Human Button */}
+          <div className="flex items-center space-x-2 shrink-0">
+            <span className="text-[10px] text-[#8A8A8A] font-medium">
+              Status: <strong className={ticketStatus === 'Human Requested' ? 'text-[#FF334B]' : 'text-[#7CFF00]'}>{ticketStatus}</strong>
             </span>
 
-            {/* Request Human Action */}
             {ticketStatus === 'Resolved' ? (
-              <span id="customer-status-badge-resolved" className="text-[11px] text-[#7CFF00] font-semibold px-2 py-0.5 rounded bg-[#7CFF00]/10 border border-[#7CFF00]/40">
+              <span id="customer-status-badge-resolved" className="text-[10px] text-[#7CFF00] font-semibold px-2 py-0.5 rounded bg-[#7CFF00]/10 border border-[#7CFF00]/40">
                 Resolved
               </span>
             ) : ticketStatus === 'Human Agent Active' ? (
-              <span id="customer-status-badge-active" className="text-[11px] text-[#FFFFFF] font-semibold px-2 py-0.5 rounded bg-[#161616] border border-[#7CFF00]/40 flex items-center space-x-1.5">
+              <span id="customer-status-badge-active" className="text-[10px] text-[#FFFFFF] font-semibold px-2 py-0.5 rounded bg-[#161616] border border-[#7CFF00]/40 flex items-center space-x-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#7CFF00] shadow-neon-sm" />
                 <span>Sarah Lin Active</span>
               </span>
             ) : ticketStatus === 'Human Requested' ? (
-              <span id="customer-status-badge-requested" className="text-[11px] text-[#FF334B] font-semibold px-2 py-0.5 rounded bg-[#250C10] border border-[#5C151F]">
+              <span id="customer-status-badge-requested" className="text-[10px] text-[#FF334B] font-semibold px-2 py-0.5 rounded bg-[#250C10] border border-[#5C151F]">
                 Human Requested
               </span>
             ) : (
               <button
                 id="btn-request-human"
                 onClick={handleRequestHuman}
-                className="flex items-center space-x-1 px-2.5 py-1 rounded text-xs font-semibold bg-[#161616] hover:bg-[#202020] text-[#FFFFFF] border border-[#222222] hover:border-[#7CFF00]/40 transition-colors"
+                className="flex items-center space-x-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-[#161616] hover:bg-[#202020] text-[#FFFFFF] border border-[#222222] hover:border-[#7CFF00]/40 transition-colors"
               >
-                <UserCheck className="w-3.5 h-3.5 text-[#7CFF00]" />
+                <UserCheck className="w-3 h-3 text-[#7CFF00]" />
                 <span>Request Human</span>
               </button>
             )}
           </div>
         </div>
 
-        {/* Chat Messages Stream */}
-        <div id="customer-chat-messages" className="flex-1 overflow-y-auto p-4 space-y-3.5 bg-[#090909]">
-          {messages.map((msg) => {
-            const isMe = msg.senderRole === 'customer' || msg.senderId === customer?.id;
-            const isSystem = msg.senderRole === 'system';
+        {/* Collapsible Tracking Drawer */}
+        {showOrderDetails && (
+          <div className="mt-2 p-2 rounded bg-[#141414] border border-[#222222] text-[11px] text-[#8A8A8A] leading-relaxed animate-fadeIn">
+            <div className="flex items-center justify-between text-[#8A8A8A] mb-1">
+              <span>Status: <strong className="text-[#FFFFFF]">{customer?.order?.status}</strong></span>
+              <span>Carrier: <strong className="text-[#FFFFFF]">{customer?.order?.carrier}</strong></span>
+            </div>
+            <span className="text-[#555555] block text-[9px] uppercase font-bold">Latest Note</span>
+            <span className="text-[#FFFFFF]">{customer?.order?.trackingStatus}</span>
+          </div>
+        )}
+      </div>
 
-            if (isSystem) {
-              return (
-                <div key={msg.id} className="flex justify-center my-2">
-                  <div className="px-3 py-1 rounded bg-[#161616] border border-[#222222] text-[11px] text-[#8A8A8A]">
-                    {msg.text}
-                  </div>
-                </div>
-              );
-            }
+      {/* Chat Messages Stream */}
+      <div id="customer-chat-messages" className="flex-1 overflow-y-auto px-4 py-3 space-y-3 bg-[#090909]">
+        {messages.map((msg) => {
+          const isMe = msg.senderRole === 'customer' || msg.senderId === customer?.id;
+          const isSystem = msg.senderRole === 'system';
 
+          if (isSystem) {
             return (
-              <div
-                key={msg.id}
-                className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
-              >
-                <div className="flex items-center space-x-1.5 mb-1 text-[11px] text-[#8A8A8A] px-1">
-                  <span className={isMe ? 'text-[#7CFF00] font-semibold' : 'text-[#FFFFFF] font-semibold'}>
-                    {isMe ? 'You' : msg.senderName || 'Support Agent'}
-                  </span>
-                  <span>·</span>
-                  <span className="text-[10px] font-mono">
-                    {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </span>
-                </div>
-
-                <div
-                  className={`max-w-[80%] rounded px-3.5 py-2 text-xs leading-relaxed ${
-                    isMe
-                      ? 'bg-[#161616] border border-[#7CFF00]/40 text-[#FFFFFF]'
-                      : 'bg-[#1C1C1C] border border-[#282828] text-[#FFFFFF]'
-                  }`}
-                >
-                  <p className="whitespace-pre-wrap">{msg.text}</p>
+              <div key={msg.id} className="flex justify-center my-2">
+                <div className="px-3 py-1 rounded bg-[#141414] border border-[#222222] text-[10px] text-[#8A8A8A]">
+                  {msg.text}
                 </div>
               </div>
             );
-          })}
-          <div ref={messagesEndRef} />
-        </div>
+          }
 
-        {/* Quick Suggestion Chips */}
-        <div className="px-3 py-1.5 bg-[#0E0E0E] border-t border-[#1C1C1C] flex items-center space-x-1.5 overflow-x-auto no-scrollbar">
-          <span className="text-[11px] text-[#555555] shrink-0 font-bold uppercase">Quick ask:</span>
-          {quickPrompts.map((prompt, i) => (
-            <button
-              key={i}
-              onClick={() => setInputText(prompt)}
-              className="text-[11px] whitespace-nowrap bg-[#161616] hover:bg-[#202020] text-[#8A8A8A] hover:text-[#FFFFFF] hover:border-[#7CFF00]/40 px-2 py-0.5 rounded border border-[#222222] transition-colors"
+          return (
+            <div
+              key={msg.id}
+              className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
             >
-              {prompt}
-            </button>
-          ))}
-        </div>
+              <div className="flex items-center space-x-1.5 mb-1 text-[10px] text-[#8A8A8A] px-1">
+                <span className={isMe ? 'text-[#7CFF00] font-semibold' : 'text-[#FFFFFF] font-semibold'}>
+                  {isMe ? 'You' : msg.senderName || 'Support Agent'}
+                </span>
+                <span>·</span>
+                <span className="font-mono">
+                  {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </div>
 
-        {/* Composer */}
-        <form onSubmit={handleSendMessage} className="p-2.5 bg-[#0E0E0E] border-t border-[#222222] flex items-center space-x-2">
-          <input
-            type="text"
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            placeholder={ticketStatus === 'Resolved' ? "Inquiry resolved · Type a message to re-open..." : "Type your message..."}
-            disabled={isSending}
-            className="flex-1 bg-[#161616] border border-[#222222] focus:border-[#7CFF00] rounded px-3 py-2 text-xs text-[#FFFFFF] placeholder-[#8A8A8A] focus:outline-none transition-colors disabled:opacity-50"
-          />
-          <button
-            type="submit"
-            disabled={!inputText.trim() || isSending}
-            className="px-3.5 py-2 rounded bg-[#7CFF00] hover:bg-[#8EFF1F] text-[#090909] text-xs font-bold flex items-center space-x-1.5 transition-all shadow-neon-sm disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
-          >
-            <span>{isSending ? 'Sending...' : 'Send'}</span>
-            <Send className="w-3.5 h-3.5" />
-          </button>
-        </form>
+              <div
+                className={`max-w-[82%] rounded-lg px-3.5 py-2 text-xs leading-relaxed ${
+                  isMe
+                    ? 'bg-[#161616] border border-[#7CFF00]/40 text-[#FFFFFF]'
+                    : 'bg-[#1C1C1C] border border-[#282828] text-[#FFFFFF]'
+                }`}
+              >
+                <p className="whitespace-pre-wrap">{msg.text}</p>
+              </div>
+            </div>
+          );
+        })}
+        <div ref={messagesEndRef} />
       </div>
+
+      {/* Quick Suggestion Chips */}
+      <div className="px-3 py-1 bg-[#0E0E0E] border-t border-[#1C1C1C] flex items-center space-x-1.5 overflow-x-auto no-scrollbar shrink-0">
+        <span className="text-[10px] text-[#555555] shrink-0 font-bold uppercase">Quick ask:</span>
+        {quickPrompts.map((prompt, i) => (
+          <button
+            key={i}
+            onClick={() => setInputText(prompt)}
+            className="text-[10px] whitespace-nowrap bg-[#141414] hover:bg-[#1E1E1E] text-[#8A8A8A] hover:text-[#FFFFFF] hover:border-[#7CFF00]/40 px-2 py-0.5 rounded border border-[#222222] transition-colors"
+          >
+            {prompt}
+          </button>
+        ))}
+      </div>
+
+      {/* Pinned Message Composer at Bottom */}
+      <form onSubmit={handleSendMessage} className="p-2.5 bg-[#0E0E0E] border-t border-[#1E1E1E] flex items-center space-x-2 shrink-0">
+        <input
+          type="text"
+          value={inputText}
+          onChange={(e) => setInputText(e.target.value)}
+          placeholder={ticketStatus === 'Resolved' ? "Inquiry resolved · Type to re-open..." : "Type your message..."}
+          disabled={isSending}
+          className="flex-1 bg-[#141414] border border-[#222222] focus:border-[#7CFF00] rounded px-3 py-2 text-xs text-[#FFFFFF] placeholder-[#8A8A8A] focus:outline-none transition-colors disabled:opacity-50"
+        />
+        <button
+          type="submit"
+          disabled={!inputText.trim() || isSending}
+          className="px-3.5 py-2 rounded bg-[#7CFF00] hover:bg-[#8EFF1F] text-[#090909] text-xs font-bold flex items-center space-x-1 transition-all shadow-neon-sm disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+        >
+          <span>{isSending ? 'Sending...' : 'Send'}</span>
+          <Send className="w-3.5 h-3.5" />
+        </button>
+      </form>
+    </div>
+  );
+
+  if (compact) {
+    return portalContent;
+  }
+
+  return (
+    <div className="w-full max-w-2xl h-full flex flex-col bg-[#0E0E0E] border border-[#222222] rounded-xl overflow-hidden shadow-2xl">
+      {portalContent}
     </div>
   );
 }

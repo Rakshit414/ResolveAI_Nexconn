@@ -103,6 +103,11 @@ async function runMilestone3Verification() {
     const pagePriya = await ctxPriya.newPage();
     const pageSplit = await ctxSplit.newPage();
 
+    // Reset ticket states to clean baseline for verification
+    await axios.patch(`${BACKEND_URL}/api/tickets/tkt_1021`, { status: 'AI Handling', humanRequested: false }).catch(() => {});
+    await axios.patch(`${BACKEND_URL}/api/tickets/tkt_1022`, { status: 'AI Handling', humanRequested: false }).catch(() => {});
+    await axios.patch(`${BACKEND_URL}/api/tickets/tkt_1023`, { status: 'AI Handling', humanRequested: false }).catch(() => {});
+
     // Open sessions
     console.log('[Setup] Navigating isolated contexts...');
     await pageAgent.goto(`${FRONTEND_URL}/agent`, { waitUntil: 'domcontentloaded' });

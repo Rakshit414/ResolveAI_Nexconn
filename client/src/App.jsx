@@ -54,7 +54,7 @@ export default function App() {
           <Route
             path="/"
             element={
-              <div className="py-4 overflow-y-auto h-[calc(100vh-52px)]">
+              <div className="h-[calc(100vh-52px)] p-2 md:p-4 flex justify-center overflow-hidden bg-[#090909]">
                 <CustomerPortal
                   customer={currentCustomer}
                   onSelectCustomer={handleSelectCustomer}
@@ -65,7 +65,7 @@ export default function App() {
           <Route
             path="/customer"
             element={
-              <div className="py-4 overflow-y-auto h-[calc(100vh-52px)]">
+              <div className="h-[calc(100vh-52px)] p-2 md:p-4 flex justify-center overflow-hidden bg-[#090909]">
                 <CustomerPortal
                   customer={currentCustomer}
                   onSelectCustomer={handleSelectCustomer}

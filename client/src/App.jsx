@@ -18,7 +18,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#191A19] text-[#D5D9D3] flex flex-col font-sans">
+    <div className="min-h-screen bg-[#090909] text-[#FFFFFF] flex flex-col font-sans">
       {/* Top Global Navigation Bar */}
       <Navbar
         currentCustomer={currentCustomer}

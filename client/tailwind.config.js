@@ -7,38 +7,47 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Brand permanent colour system
-        charcoal: {
-          DEFAULT: '#191A19', // Main background
-          deep: '#111311',    // Navigation and sidebar background
-          elevated: '#242724',// Cards and elevated panels
-          surface: '#1E211E', // Secondary surface
+        // Final Resolve AI Brand Colour Palette
+        jet: {
+          DEFAULT: '#090909', // Jet Black - dominant interface background
+          deep: '#0E0E0E',    // Navigation, sidebar, header surfaces
+          elevated: '#161616',// Cards, panels, message bubbles
+          surface: '#1F1F1F', // Dropdowns, hovered items
+          hover: '#262626',   // Hover state
         },
-        forest: {
-          DEFAULT: '#174B35', // Primary interactions and active elements
-          hover: '#1F6246',   // Hover state
-          active: '#133D2B',  // Active pressed state
-          subtle: '#142E22',  // Subtle background highlight
-          border: '#235D43',  // Active border
+        neon: {
+          DEFAULT: '#7CFF00', // Neon Fluorescent Lime Green - primary signature accent
+          hover: '#8EFF1F',   // Electric hover
+          active: '#6AE600',  // Pressed active
+          dim: 'rgba(124, 255, 0, 0.12)', // Subtle highlight background
+          border: 'rgba(124, 255, 0, 0.35)', // Subtle accent border
         },
-        crimson: {
-          DEFAULT: '#A51F32', // Critical alerts and urgent states
-          hover: '#BE253B',   // Hover state
-          subtle: '#2A1316',  // Subtle background for critical
-          border: '#5C1721',  // Border for critical
+        pure: {
+          white: '#FFFFFF',   // Pure White - typography
         },
         txt: {
-          primary: '#D5D9D3', // Primary main content text
-          muted: '#929A91',   // Secondary muted information
-          dim: '#687267',     // Dim helper text
+          primary: '#FFFFFF', // High-contrast primary text
+          secondary: '#C8C8C8', // Secondary clear text
+          muted: '#8A8A8A',   // Timestamps, helper metadata
+          dim: '#555555',     // Very dim text
         },
-        subtle: {
-          border: '#353B35',  // Dividers and card borders
-          divider: '#2A302A', // Lighter divider
+        border: {
+          subtle: '#222222',  // Minimal card and section dividers
+          divider: '#1A1A1A', // Dark divider
+          accent: '#7CFF00',  // Accent border
+        },
+        alert: {
+          red: '#FF334B',     // Critical alert indicator
+          subtle: '#250C10',  // Urgent alert background
+          border: '#5C151F',  // Urgent alert border
         }
       },
       fontFamily: {
         sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+      },
+      boxShadow: {
+        'neon-sm': '0 0 10px -2px rgba(124, 255, 0, 0.35)',
+        'neon-md': '0 0 20px -3px rgba(124, 255, 0, 0.40)',
       },
       borderRadius: {
         'sm': '4px',

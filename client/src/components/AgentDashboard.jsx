@@ -1,9 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Inbox, 
-  MessageSquare, 
-  Sparkles
-} from 'lucide-react';
 import { DEMO_CUSTOMERS, DEMO_AGENT } from '../data/demoData';
 import { getTickets, updateTicket } from '../services/api';
 import nexconnService from '../services/nexconnService';
@@ -30,7 +25,6 @@ export default function AgentDashboard({
     resolved: 0,
   });
 
-  // Initialize tickets and agent session
   useEffect(() => {
     nexconnService.connectUser({
       id: DEMO_AGENT.id,
@@ -192,35 +186,35 @@ export default function AgentDashboard({
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-52px)] bg-[#191A19] overflow-hidden">
+    <div className="flex flex-col h-[calc(100vh-52px)] bg-[#090909] overflow-hidden">
       {/* Subdued Status & Metrics Sub-header */}
-      <div className="bg-[#111311] border-b border-[#353B35] px-4 py-2 flex items-center justify-between shrink-0 text-xs">
+      <div className="bg-[#0E0E0E] border-b border-[#222222] px-4 py-2 flex items-center justify-between shrink-0 text-xs">
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-2">
-            <span className="w-2 h-2 rounded-full bg-[#174B35]" />
-            <span className="font-medium text-[#D5D9D3]">Agent Workspace</span>
-            <span className="text-[#929A91] hidden sm:inline">({DEMO_AGENT.name})</span>
+            <span className="w-2 h-2 rounded-full bg-[#7CFF00] shadow-neon-sm" />
+            <span className="font-semibold text-[#FFFFFF]">Agent Workspace</span>
+            <span className="text-[#8A8A8A] hidden sm:inline">({DEMO_AGENT.name})</span>
           </div>
         </div>
 
         {/* Minimal metrics text indicators */}
-        <div className="flex items-center space-x-3 text-[11px] text-[#929A91]">
-          <span>Queue: <strong className="text-[#D5D9D3]">{stats.total}</strong></span>
+        <div className="flex items-center space-x-3 text-[11px] text-[#8A8A8A]">
+          <span>Queue: <strong className="text-[#FFFFFF]">{stats.total}</strong></span>
           <span>·</span>
-          <span>Urgent: <strong className={stats.urgent > 0 ? "text-[#A51F32]" : "text-[#D5D9D3]"}>{stats.urgent}</strong></span>
+          <span>Urgent: <strong className={stats.urgent > 0 ? "text-[#FF334B]" : "text-[#FFFFFF]"}>{stats.urgent}</strong></span>
           <span>·</span>
-          <span>Handoffs: <strong className="text-[#D5D9D3]">{stats.humanHandoffs}</strong></span>
+          <span>Handoffs: <strong className="text-[#FFFFFF]">{stats.humanHandoffs}</strong></span>
           <span>·</span>
-          <span>Resolved: <strong className="text-[#174B35]">{stats.resolved}</strong></span>
+          <span>Resolved: <strong className="text-[#7CFF00]">{stats.resolved}</strong></span>
         </div>
       </div>
 
       {/* Mobile Tab Switcher */}
-      <div className="md:hidden flex items-center border-b border-[#353B35] bg-[#111311] text-xs">
+      <div className="md:hidden flex items-center border-b border-[#222222] bg-[#0E0E0E] text-xs">
         <button
           onClick={() => setMobileTab('inbox')}
           className={`flex-1 py-2 text-center font-medium ${
-            mobileTab === 'inbox' ? 'text-[#D5D9D3] border-b-2 border-[#174B35]' : 'text-[#929A91]'
+            mobileTab === 'inbox' ? 'text-[#7CFF00] border-b-2 border-[#7CFF00]' : 'text-[#8A8A8A]'
           }`}
         >
           Inbox ({filteredTickets.length})
@@ -228,7 +222,7 @@ export default function AgentDashboard({
         <button
           onClick={() => setMobileTab('chat')}
           className={`flex-1 py-2 text-center font-medium ${
-            mobileTab === 'chat' ? 'text-[#D5D9D3] border-b-2 border-[#174B35]' : 'text-[#929A91]'
+            mobileTab === 'chat' ? 'text-[#7CFF00] border-b-2 border-[#7CFF00]' : 'text-[#8A8A8A]'
           }`}
         >
           Chat
@@ -236,7 +230,7 @@ export default function AgentDashboard({
         <button
           onClick={() => setMobileTab('copilot')}
           className={`flex-1 py-2 text-center font-medium ${
-            mobileTab === 'copilot' ? 'text-[#D5D9D3] border-b-2 border-[#174B35]' : 'text-[#929A91]'
+            mobileTab === 'copilot' ? 'text-[#7CFF00] border-b-2 border-[#7CFF00]' : 'text-[#8A8A8A]'
           }`}
         >
           AI Copilot
@@ -264,7 +258,7 @@ export default function AgentDashboard({
           />
         </div>
 
-        {/* Center: Conversation Workspace (Receives full priority & horizontal space!) */}
+        {/* Center: Conversation Workspace */}
         <div className={`flex-1 h-full min-w-0 ${
           mobileTab === 'chat' ? 'block' : 'hidden md:block'
         }`}>
@@ -278,13 +272,13 @@ export default function AgentDashboard({
               onToggleCopilot={() => setIsCopilotOpen(!isCopilotOpen)}
             />
           ) : (
-            <div className="flex-1 flex items-center justify-center p-6 text-[#929A91] text-xs">
+            <div className="flex-1 flex items-center justify-center p-6 text-[#8A8A8A] text-xs">
               Select a conversation to begin.
             </div>
           )}
         </div>
 
-        {/* Right: AI Copilot Panel (Collapsible!) */}
+        {/* Right: AI Copilot Panel (Collapsible) */}
         {isCopilotOpen && selectedTicket && (
           <div className={`w-full md:w-72 lg:w-80 shrink-0 h-full ${
             mobileTab === 'copilot' ? 'block' : 'hidden lg:block'

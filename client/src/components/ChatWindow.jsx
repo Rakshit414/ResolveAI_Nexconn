@@ -104,6 +104,7 @@ export default function ChatWindow({
           {/* Take Over Button when human requested */}
           {isHandoffRequested && (
             <button
+              id="btn-takeover-ticket"
               onClick={() => onUpdateStatus('Human Agent Active')}
               className="flex items-center space-x-1.5 px-3 py-1.5 rounded text-xs font-bold bg-[#7CFF00] hover:bg-[#8EFF1F] text-[#090909] transition-all shadow-neon-sm"
             >
@@ -115,6 +116,7 @@ export default function ChatWindow({
           {/* Mark Resolved Action */}
           {!isResolved ? (
             <button
+              id="btn-resolve-ticket"
               onClick={() => onUpdateStatus('Resolved')}
               className="flex items-center space-x-1 px-2.5 py-1.5 rounded text-xs font-medium text-[#8A8A8A] hover:text-[#FFFFFF] bg-[#161616] hover:bg-[#202020] border border-[#222222] hover:border-[#7CFF00]/40 transition-colors"
             >
@@ -122,9 +124,16 @@ export default function ChatWindow({
               <span>Resolve</span>
             </button>
           ) : (
-            <span className="text-xs text-[#7CFF00] px-2.5 py-1 bg-[#7CFF00]/10 rounded border border-[#7CFF00]/30 font-medium">
-              Resolved
-            </span>
+            <button
+              id="btn-reopen-ticket"
+              onClick={() => onUpdateStatus('Human Agent Active')}
+              className="flex items-center space-x-1.5 px-2.5 py-1 bg-[#7CFF00]/10 hover:bg-[#7CFF00]/20 rounded border border-[#7CFF00]/40 text-xs transition-colors"
+              title="Ticket resolved. Click to reopen."
+            >
+              <Check className="w-3 h-3 text-[#7CFF00]" />
+              <span className="text-[#7CFF00] font-semibold">Resolved</span>
+              <span className="text-[10px] text-[#8A8A8A]">(Reopen)</span>
+            </button>
           )}
 
           {/* Toggle AI Copilot Panel */}

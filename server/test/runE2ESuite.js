@@ -124,6 +124,24 @@ async function run() {
         if (res.data.ticket.status !== 'Human Requested') throw new Error('Status not Human Requested');
       });
 
+      // 9. Agent Takeover workflow
+      await check('POST /api/tickets/tkt_1021/take-over', async () => {
+        const res = await axios.post(`${BASE_URL}/api/tickets/tkt_1021/take-over`);
+        if (res.data.ticket.status !== 'Human Agent Active') throw new Error('Status not Human Agent Active');
+      });
+
+      // 10. Ticket Resolution workflow
+      await check('POST /api/tickets/tkt_1021/resolve', async () => {
+        const res = await axios.post(`${BASE_URL}/api/tickets/tkt_1021/resolve`);
+        if (res.data.ticket.status !== 'Resolved') throw new Error('Status not Resolved');
+      });
+
+      // 11. Reset Tickets workflow
+      await check('POST /api/tickets/reset', async () => {
+        const res = await axios.post(`${BASE_URL}/api/tickets/reset`);
+        if (!res.data.success || !res.data.tickets) throw new Error('Reset failed');
+      });
+
     } finally {
       server.close(() => {
         console.log(`\n=====================================================`);

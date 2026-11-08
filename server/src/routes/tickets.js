@@ -1,19 +1,59 @@
 import express from 'express';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { DEMO_CUSTOMERS } from '../data/demoData.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const DATA_DIR = path.resolve(__dirname, '../../data');
+const TICKETS_FILE = path.resolve(DATA_DIR, 'tickets.json');
 
 const router = express.Router();
 
-// In-memory tickets store initialized from DEMO_CUSTOMERS
-let tickets = DEMO_CUSTOMERS.map(c => ({
-  ...c.ticket,
-  customer: {
-    id: c.id,
-    name: c.name,
-    email: c.email,
-    avatar: c.avatar,
-    order: c.order,
+function getInitialTickets() {
+  return DEMO_CUSTOMERS.map(c => ({
+    ...c.ticket,
+    customer: {
+      id: c.id,
+      name: c.name,
+      email: c.email,
+      avatar: c.avatar,
+      order: c.order,
+    }
+  }));
+}
+
+function saveTickets(ticketsList) {
+  try {
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+    fs.writeFileSync(TICKETS_FILE, JSON.stringify(ticketsList, null, 2), 'utf8');
+  } catch (err) {
+    console.warn('[Tickets] Failed to persist tickets to disk:', err.message);
   }
-}));
+}
+
+function loadTickets() {
+  try {
+    if (fs.existsSync(TICKETS_FILE)) {
+      const data = fs.readFileSync(TICKETS_FILE, 'utf8');
+      const parsed = JSON.parse(data);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (err) {
+    console.warn('[Tickets] Failed to load tickets from disk, seeding defaults:', err.message);
+  }
+  const defaults = getInitialTickets();
+  saveTickets(defaults);
+  return defaults;
+}
+
+// In-memory tickets store backed by local disk persistence
+let tickets = loadTickets();
 
 // GET /api/tickets - List all tickets with optional filtering
 router.get('/', (req, res) => {
@@ -69,6 +109,7 @@ router.patch('/:id', (req, res) => {
   if (pendingAction !== undefined) tickets[index].pendingAction = pendingAction;
   
   tickets[index].lastUpdated = new Date().toISOString();
+  saveTickets(tickets);
 
   res.json({ success: true, ticket: tickets[index] });
 });
@@ -83,11 +124,61 @@ router.post('/:id/human-handoff', (req, res) => {
   tickets[index].humanRequested = true;
   tickets[index].status = 'Human Requested';
   tickets[index].lastUpdated = new Date().toISOString();
+  saveTickets(tickets);
 
   res.json({
     success: true,
     message: 'Human agent assistance requested successfully',
     ticket: tickets[index],
+  });
+});
+
+// POST /api/tickets/:id/take-over - Agent takes over ticket
+router.post('/:id/take-over', (req, res) => {
+  const index = tickets.findIndex(t => t.id === req.params.id || t.orderId === req.params.id);
+  if (index === -1) {
+    return res.status(404).json({ success: false, error: 'Ticket not found' });
+  }
+
+  tickets[index].humanRequested = false;
+  tickets[index].status = 'Human Agent Active';
+  tickets[index].lastUpdated = new Date().toISOString();
+  saveTickets(tickets);
+
+  res.json({
+    success: true,
+    message: 'Agent took over ticket successfully',
+    ticket: tickets[index],
+  });
+});
+
+// POST /api/tickets/:id/resolve - Agent marks ticket as resolved
+router.post('/:id/resolve', (req, res) => {
+  const index = tickets.findIndex(t => t.id === req.params.id || t.orderId === req.params.id);
+  if (index === -1) {
+    return res.status(404).json({ success: false, error: 'Ticket not found' });
+  }
+
+  tickets[index].humanRequested = false;
+  tickets[index].status = 'Resolved';
+  tickets[index].lastUpdated = new Date().toISOString();
+  saveTickets(tickets);
+
+  res.json({
+    success: true,
+    message: 'Ticket marked as resolved successfully',
+    ticket: tickets[index],
+  });
+});
+
+// POST /api/tickets/reset - Reset tickets to initial seed state
+router.post('/reset', (req, res) => {
+  tickets = getInitialTickets();
+  saveTickets(tickets);
+  res.json({
+    success: true,
+    message: 'Tickets reset to demo defaults successfully',
+    tickets,
   });
 });
 

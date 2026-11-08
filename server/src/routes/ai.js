@@ -127,7 +127,7 @@ Return ONLY a valid JSON object matching this schema without markdown fences:
   return res.json({
     success: true,
     source: 'fallback',
-    configured: Boolean(model),
+    configured: Boolean(process.env.GEMINI_API_KEY),
     data: {
       category,
       priority,
@@ -183,7 +183,7 @@ Generate a concise summary of the conversation in valid JSON without markdown fe
   return res.json({
     success: true,
     source: 'fallback',
-    configured: Boolean(model),
+    configured: Boolean(process.env.GEMINI_API_KEY),
     data: {
       whatHappened: order?.reportedIssue || `Customer reached out regarding order ${order?.orderId || 'inquiry'}.`,
       customerNeeds: order?.orderId ? `Resolution for order ${order.orderId} (${order.product}).` : 'Support clarification.',
@@ -264,7 +264,7 @@ Return valid JSON without markdown fences:
   return res.json({
     success: true,
     source: 'fallback',
-    configured: Boolean(model),
+    configured: Boolean(process.env.GEMINI_API_KEY),
     data: {
       suggestedReply: reply,
       policyReferences: policies,

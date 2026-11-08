@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { DEMO_CUSTOMERS, DEMO_AGENT } from '../data/demoData';
-import { getTickets, updateTicket } from '../services/api';
+import { getTickets, updateTicket, takeOverTicket, resolveTicket } from '../services/api';
 import nexconnService from '../services/nexconnService';
 import ConversationInbox from './ConversationInbox';
 import ChatWindow from './ChatWindow';
@@ -36,18 +36,24 @@ export default function AgentDashboard({
       role: 'agent',
     });
 
-    const initialTickets = DEMO_CUSTOMERS.map((c) => ({
-      ...c.ticket,
-      channelId: c.channelId || `channel_${c.order.orderId}`,
-      customer: {
-        id: c.id,
-        name: c.name,
-        email: c.email,
+    // Seed tickets from DEMO_CUSTOMERS merged with stored ticket statuses
+    const initialTickets = DEMO_CUSTOMERS.map((c) => {
+      const stored = nexconnService.getTicketStatus(c.ticket.id);
+      return {
+        ...c.ticket,
+        status: stored?.status || c.ticket.status,
+        humanRequested: stored !== null ? (stored.status === 'Human Requested') : c.ticket.humanRequested,
         channelId: c.channelId || `channel_${c.order.orderId}`,
-        avatar: c.avatar,
-        order: c.order,
-      },
-    }));
+        customer: {
+          id: c.id,
+          name: c.name,
+          email: c.email,
+          channelId: c.channelId || `channel_${c.order.orderId}`,
+          avatar: c.avatar,
+          order: c.order,
+        },
+      };
+    });
 
     setTickets(initialTickets);
 
@@ -63,8 +69,34 @@ export default function AgentDashboard({
     });
     setMessagesMap(initialMap);
 
+    // Fetch latest tickets from backend to ensure cross-restart sync
+    getTickets()
+      .then((res) => {
+        if (res?.tickets && res.tickets.length > 0) {
+          setTickets((prev) =>
+            prev.map((t) => {
+              const remote = res.tickets.find((rt) => rt.id === t.id);
+              if (remote) {
+                nexconnService.setTicketStatus(t.id, remote.status);
+                return {
+                  ...t,
+                  status: remote.status,
+                  priority: remote.priority || t.priority,
+                  category: remote.category || t.category,
+                  humanRequested: remote.status === 'Human Requested' || Boolean(remote.humanRequested),
+                  summary: remote.summary || t.summary,
+                  suggestedReply: remote.suggestedReply || t.suggestedReply,
+                  pendingAction: remote.pendingAction || t.pendingAction,
+                };
+              }
+              return t;
+            })
+          );
+        }
+      })
+      .catch(() => {});
+
     // Subscribe to each channel's events independently and store cleanup handlers
-    // Clean up any existing listeners first
     subscriptionsRef.current.forEach((unsub) => unsub());
     subscriptionsRef.current = [];
 
@@ -74,7 +106,6 @@ export default function AgentDashboard({
         // When a message arrives on this channel, update only this ticket's messages
         setMessagesMap((prev) => {
           const currentList = prev[t.id] || [];
-          // Deduplicate by message ID
           if (currentList.some((m) => m.id === newMsg.id || (m.messageId && m.messageId === newMsg.messageId))) {
             return prev;
           }
@@ -84,7 +115,44 @@ export default function AgentDashboard({
           };
         });
 
-        if (newMsg.senderRole === 'customer') {
+        const msgTime = newMsg.timestamp ? new Date(newMsg.timestamp).getTime() : Date.now();
+        const isLive = (Date.now() - msgTime) < 30000;
+
+        // If message contains status transition metadata or status change text
+        let s = newMsg.metadata?.status;
+        if (!s && newMsg.text && isLive) {
+          if (newMsg.text.includes('requested human agent assistance') || newMsg.text.includes('requested human assistance')) {
+            s = 'Human Requested';
+          } else if (newMsg.text.includes('joined the conversation and taken over')) {
+            s = 'Human Agent Active';
+          } else if (newMsg.text.includes('marked as resolved')) {
+            s = 'Resolved';
+          }
+        }
+
+        if (s && isLive) {
+          setTickets((prev) =>
+            prev.map((item) =>
+              item.id === t.id
+                ? {
+                    ...item,
+                    status: s,
+                    humanRequested: s === 'Human Requested',
+                    lastUpdated: new Date().toISOString(),
+                  }
+                : item
+            )
+          );
+          setSelectedTicket((prev) =>
+            prev?.id === t.id
+              ? {
+                  ...prev,
+                  status: s,
+                  humanRequested: s === 'Human Requested',
+                }
+              : prev
+          );
+        } else if (newMsg.senderRole === 'customer') {
           setTickets((prev) =>
             prev.map((item) =>
               item.id === t.id
@@ -183,7 +251,7 @@ export default function AgentDashboard({
         }));
 
         if (selectedTicket.status !== 'Human Agent Active' && selectedTicket.status !== 'Resolved') {
-          handleUpdateStatus('Human Agent Active');
+          await handleUpdateStatus('Human Agent Active');
         }
       }
     } catch (err) {
@@ -191,16 +259,17 @@ export default function AgentDashboard({
     }
   };
 
-  const handleUpdateStatus = (newStatus) => {
+  const handleUpdateStatus = async (newStatus) => {
     if (!selectedTicket) return;
 
+    // 1. Update local state
     setTickets((prev) =>
       prev.map((t) =>
         t.id === selectedTicket.id
           ? {
               ...t,
               status: newStatus,
-              humanRequested: newStatus === 'Resolved' ? false : t.humanRequested,
+              humanRequested: newStatus === 'Human Requested' ? true : newStatus === 'Resolved' ? false : t.humanRequested,
               lastUpdated: new Date().toISOString(),
             }
           : t
@@ -208,10 +277,60 @@ export default function AgentDashboard({
     );
 
     setSelectedTicket((prev) =>
-      prev ? { ...prev, status: newStatus } : null
+      prev
+        ? {
+            ...prev,
+            status: newStatus,
+            humanRequested: newStatus === 'Human Requested' ? true : newStatus === 'Resolved' ? false : prev.humanRequested,
+          }
+        : null
     );
 
-    updateTicket(selectedTicket.id, { status: newStatus }).catch(console.warn);
+    // 2. Persist in local storage
+    nexconnService.setTicketStatus(selectedTicket.id, newStatus);
+
+    // 3. Update backend
+    try {
+      if (newStatus === 'Human Agent Active') {
+        await takeOverTicket(selectedTicket.id).catch(console.warn);
+      } else if (newStatus === 'Resolved') {
+        await resolveTicket(selectedTicket.id).catch(console.warn);
+      } else {
+        await updateTicket(selectedTicket.id, { status: newStatus }).catch(console.warn);
+      }
+    } catch (err) {
+      console.warn('Backend ticket update error:', err);
+    }
+
+    // 4. Broadcast status change notice over Nexconn
+    try {
+      const channelId = selectedTicket.channelId || `channel_${selectedTicket.orderId}`;
+      const targetUserId = selectedTicket.customer?.id;
+      const noticeText = newStatus === 'Human Agent Active'
+        ? `Sarah Lin (Support Specialist) has joined the conversation and taken over order #${selectedTicket.orderId}.`
+        : newStatus === 'Resolved'
+        ? `Ticket for order #${selectedTicket.orderId} marked as resolved by Sarah Lin. Thank you for contacting NovaCart Support!`
+        : `Ticket status for order #${selectedTicket.orderId} updated to: ${newStatus}`;
+
+      await nexconnService.sendMessage({
+        targetUserId,
+        channelId,
+        text: noticeText,
+        metadata: {
+          ticketId: selectedTicket.id,
+          status: newStatus,
+          type: 'STATUS_CHANGE',
+        },
+      });
+
+      // Update messagesMap
+      setMessagesMap((prev) => ({
+        ...prev,
+        [selectedTicket.id]: nexconnService.getChannelMessages(channelId),
+      }));
+    } catch (err) {
+      console.warn('Nexconn status broadcast error:', err);
+    }
   };
 
   return (
@@ -276,7 +395,13 @@ export default function AgentDashboard({
             tickets={filteredTickets}
             selectedTicket={selectedTicket}
             onSelectTicket={(t) => {
-              setSelectedTicket(t);
+              const currentStatus = nexconnService.getTicketStatus(t.id)?.status || t.status;
+              const updatedTicket = {
+                ...t,
+                status: currentStatus,
+                humanRequested: currentStatus === 'Human Requested',
+              };
+              setSelectedTicket(updatedTicket);
               if (onSelectTicketId) onSelectTicketId(t.id);
               // Fresh load of messages for this ticket from channel store
               const channelId = t.channelId || `channel_${t.orderId}`;
@@ -284,6 +409,12 @@ export default function AgentDashboard({
                 ...prev,
                 [t.id]: nexconnService.getChannelMessages(channelId),
               }));
+              getTicket(t.id).then((res) => {
+                if (res?.ticket) {
+                  setSelectedTicket(res.ticket);
+                  setTickets((prev) => prev.map((item) => item.id === t.id ? { ...item, ...res.ticket } : item));
+                }
+              }).catch(() => {});
               setMobileTab('chat');
             }}
             activeFilter={activeFilter}

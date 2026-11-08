@@ -12,6 +12,14 @@ export default function SplitView({ onOpenPolicies }) {
     setSelectedTicketId(cust.ticket.id);
   };
 
+  const handleTicketSelect = (tktId) => {
+    setSelectedTicketId(tktId);
+    const matched = DEMO_CUSTOMERS.find(c => c.ticket.id === tktId);
+    if (matched && matched.id !== currentCustomer.id) {
+      setCurrentCustomer(matched);
+    }
+  };
+
   return (
     <div className="h-[calc(100vh-52px)] grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-[#222222] bg-[#090909] overflow-hidden">
       {/* Left Pane: Customer Experience */}
@@ -43,7 +51,7 @@ export default function SplitView({ onOpenPolicies }) {
         <div className="flex-1 overflow-hidden">
           <AgentDashboard
             selectedTicketId={selectedTicketId}
-            onSelectTicketId={setSelectedTicketId}
+            onSelectTicketId={handleTicketSelect}
             onOpenPolicies={onOpenPolicies}
           />
         </div>

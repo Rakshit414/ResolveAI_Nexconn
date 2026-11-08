@@ -45,6 +45,21 @@ export const requestHumanAssistance = (id) =>
     method: 'POST',
   });
 
+export const takeOverTicket = (id) =>
+  fetchAPI(`/api/tickets/${id}/take-over`, {
+    method: 'POST',
+  });
+
+export const resolveTicket = (id) =>
+  fetchAPI(`/api/tickets/${id}/resolve`, {
+    method: 'POST',
+  });
+
+export const resetTickets = () =>
+  fetchAPI('/api/tickets/reset', {
+    method: 'POST',
+  });
+
 // AI Copilot API
 export const analyzeConversation = (data) =>
   fetchAPI('/api/ai/analyze', {

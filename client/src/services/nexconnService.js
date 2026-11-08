@@ -27,6 +27,9 @@ class NexconnManager {
     // Persistent in-memory channel message history: channelId -> Message[]
     this.channelHistory = new Map();
 
+    // Persistent ticket state store: ticketId -> { status, humanRequested, lastUpdated }
+    this.ticketStatuses = new Map();
+
     // Set of seen message IDs to guarantee absolute deduplication
     this.seenMessageIds = new Set();
 
@@ -81,11 +84,67 @@ class NexconnManager {
     }
   }
 
+  saveTicketStatuses() {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const obj = {};
+        for (const [tId, val] of this.ticketStatuses.entries()) {
+          obj[tId] = val;
+        }
+        window.localStorage.setItem('resolve_ai_ticket_statuses', JSON.stringify(obj));
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  loadTicketStatuses() {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const saved = window.localStorage.getItem('resolve_ai_ticket_statuses');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          for (const tId in parsed) {
+            this.ticketStatuses.set(tId, parsed[tId]);
+          }
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  getTicketStatus(ticketId) {
+    if (!ticketId) return null;
+    return this.ticketStatuses.get(ticketId) || null;
+  }
+
+  setTicketStatus(ticketId, status, extra = {}) {
+    if (!ticketId || !status) return;
+    const current = this.ticketStatuses.get(ticketId) || {};
+    const updated = {
+      ...current,
+      ...extra,
+      status,
+      humanRequested: status === 'Human Requested' ? true : status === 'Resolved' ? false : current.humanRequested,
+      lastUpdated: new Date().toISOString(),
+    };
+    this.ticketStatuses.set(ticketId, updated);
+    this.saveTicketStatuses();
+    return updated;
+  }
+
   /**
    * Seed initial conversation history per channel
    */
   initializeSeedHistory() {
     DEMO_CUSTOMERS.forEach((c) => {
+      this.ticketStatuses.set(c.ticket.id, {
+        status: c.ticket.status,
+        humanRequested: c.ticket.humanRequested,
+        lastUpdated: c.ticket.lastUpdated,
+      });
+
       const channelId = c.channelId || `channel_${c.order.orderId}`;
       const initialMsgId = `msg_seed_${c.id}_${c.order.orderId}`;
       
@@ -108,6 +167,7 @@ class NexconnManager {
     });
 
     this.loadHistoryFromStorage();
+    this.loadTicketStatuses();
   }
 
   /**
@@ -244,27 +304,6 @@ class NexconnManager {
               if (!rawMsg) continue;
               console.log('[Nexconn] onMessageReceived from SDK event:', rawMsg?.messageId || 'no-id', 'from:', rawMsg?.senderUserId || rawMsg?.senderId);
 
-              // Extract channel identifier
-              let targetChannel = rawMsg.channelId || 
-                (rawMsg.metadata?.channelId) || 
-                (rawMsg.orderId ? `channel_${rawMsg.orderId}` : null);
-
-              // If incoming message from remote SDK user, map to channel
-              if (!targetChannel) {
-                const sender = rawMsg.senderUserId || rawMsg.senderId;
-                const target = rawMsg.channelIdentifier?.channelId || rawMsg.targetUserId;
-                
-                if (sender && sender.startsWith('cust_')) {
-                  targetChannel = this.getChannelId({ customerId: sender });
-                } else if (target && target.startsWith('cust_')) {
-                  targetChannel = this.getChannelId({ customerId: target });
-                } else if (this.currentUser?.id && this.currentUser.id.startsWith('cust_')) {
-                  targetChannel = this.getChannelId({ customerId: this.currentUser.id });
-                }
-              }
-
-              if (!targetChannel) continue;
-
               // Extract message text whether from SDK Message or payload
               let text = '';
               if (rawMsg.content && typeof rawMsg.content === 'object') {
@@ -275,15 +314,44 @@ class NexconnManager {
                 text = rawMsg.text || '';
               }
 
+              if (!text) continue;
+
+              // Extract channel identifier
+              let targetChannel = rawMsg.channelId || 
+                (rawMsg.metadata?.channelId) || 
+                (rawMsg.orderId ? `channel_${rawMsg.orderId}` : null);
+
+              // If incoming message from remote SDK user, map to channel
+              if (!targetChannel) {
+                // First check if text references an explicit order
+                if (text.includes('NC1021') || text.toLowerCase().includes('novasprint')) {
+                  targetChannel = 'channel_NC1021';
+                } else if (text.includes('NC1022') || text.toLowerCase().includes('smartwatch') || text.toLowerCase().includes('novapulse')) {
+                  targetChannel = 'channel_NC1022';
+                } else if (text.includes('NC1023') || text.toLowerCase().includes('novabass') || text.toLowerCase().includes('earphones')) {
+                  targetChannel = 'channel_NC1023';
+                } else {
+                  const sender = rawMsg.senderUserId || rawMsg.senderId;
+                  const target = rawMsg.channelIdentifier?.channelId || rawMsg.targetUserId;
+                  
+                  if (sender && sender.startsWith('cust_')) {
+                    targetChannel = this.getChannelId({ customerId: sender });
+                  } else if (target && target.startsWith('cust_')) {
+                    targetChannel = this.getChannelId({ customerId: target });
+                  } else if (this.currentUser?.id && this.currentUser.id.startsWith('cust_')) {
+                    targetChannel = this.getChannelId({ customerId: this.currentUser.id });
+                  }
+                }
+              }
+
+              if (!targetChannel) continue;
+
               console.log('[Nexconn] INCOMING RAWMSG JSON:', JSON.stringify({
                 messageId: rawMsg.messageId,
                 sender: rawMsg.senderUserId,
                 targetChannel,
-                content: rawMsg.content,
                 text
               }));
-
-              if (!text) continue;
 
               const senderId = rawMsg.senderUserId || rawMsg.senderId || 'customer';
               const isAgent = (senderId && senderId.includes('agent')) || rawMsg.senderRole === 'agent';
@@ -291,6 +359,21 @@ class NexconnManager {
               const senderName = isAgent 
                 ? 'Sarah Lin' 
                 : (customerMatch?.name || rawMsg.senderName || 'Customer');
+
+              // Decode status from metadata or message text only for recent live messages
+              const msgTime = rawMsg.sentTime ? new Date(rawMsg.sentTime).getTime() : Date.now();
+              const isLiveMessage = (Date.now() - msgTime) < 30000;
+
+              let detectedStatus = rawMsg.metadata?.status;
+              if (!detectedStatus && text && isLiveMessage) {
+                if (text.includes('requested human agent assistance') || text.includes('requested human assistance')) {
+                  detectedStatus = 'Human Requested';
+                } else if (text.includes('joined the conversation and taken over')) {
+                  detectedStatus = 'Human Agent Active';
+                } else if (text.includes('marked as resolved')) {
+                  detectedStatus = 'Resolved';
+                }
+              }
 
               const canonicalMsg = {
                 id: rawMsg.messageId || rawMsg.id || `msg_${Date.now()}`,
@@ -303,8 +386,21 @@ class NexconnManager {
                 targetUserId: rawMsg.channelIdentifier?.channelId || rawMsg.targetUserId,
                 text,
                 timestamp: rawMsg.sentTime ? new Date(rawMsg.sentTime).toISOString() : (rawMsg.timestamp || new Date().toISOString()),
-                metadata: rawMsg.metadata || {},
+                metadata: {
+                  ...rawMsg.metadata,
+                  ...(detectedStatus ? { status: detectedStatus } : {}),
+                },
               };
+
+              const resolvedTicketId = rawMsg.metadata?.ticketId || (
+                targetChannel === 'channel_NC1021' ? 'tkt_1021' : 
+                targetChannel === 'channel_NC1022' ? 'tkt_1022' : 
+                targetChannel === 'channel_NC1023' ? 'tkt_1023' : null
+              );
+
+              if (resolvedTicketId && detectedStatus && isLiveMessage) {
+                this.setTicketStatus(resolvedTicketId, detectedStatus);
+              }
 
               this.dispatchToChannel(targetChannel, canonicalMsg);
             }

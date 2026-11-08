@@ -186,9 +186,12 @@ export default function AICopilotPanel({
         {/* C. Suggested Response (Primary Focus of Copilot) */}
         <div className="bg-[#161616] border border-[#7CFF00]/30 rounded p-3.5 space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-[#FFFFFF] flex items-center space-x-1.5">
-              <span>Suggested Response</span>
-            </span>
+            <div className="flex items-center space-x-2">
+              <span className="text-xs font-bold text-[#FFFFFF]">Suggested Response</span>
+              <span className="text-[10px] text-[#7CFF00] font-mono px-1.5 py-0.5 rounded bg-[#7CFF00]/10 border border-[#7CFF00]/30">
+                AI Draft
+              </span>
+            </div>
 
             <button
               onClick={() => setIsEditingReply(!isEditingReply)}
@@ -197,6 +200,11 @@ export default function AICopilotPanel({
               <Edit3 className="w-3 h-3" />
               <span>{isEditingReply ? 'Done' : 'Edit'}</span>
             </button>
+          </div>
+
+          <div className="text-[11px] text-[#8A8A8A] flex items-center space-x-1.5 bg-[#0E0E0E] px-2.5 py-1.5 rounded border border-[#222222]">
+            <ShieldCheck className="w-3.5 h-3.5 text-[#7CFF00] shrink-0" />
+            <span>Review and edit before sending. Human approval is required.</span>
           </div>
 
           {/* Editable text area or formatted text */}
@@ -213,14 +221,14 @@ export default function AICopilotPanel({
             </div>
           )}
 
-          {/* Send Reply Action Button with Double-Click Protection */}
+          {/* Approve and Send Action Button with Double-Click Protection */}
           <button
             onClick={handleSendReply}
             disabled={!suggestedReply.trim() || isLoading || isSending}
             className="w-full py-2 px-3 rounded bg-[#7CFF00] hover:bg-[#8EFF1F] text-[#090909] text-xs font-bold flex items-center justify-center space-x-1.5 transition-all shadow-neon-sm disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Send className="w-3.5 h-3.5" />
-            <span>{isSending ? 'Sending...' : 'Send Reply'}</span>
+            <span>{isSending ? 'Sending...' : 'Approve & Send'}</span>
           </button>
         </div>
 

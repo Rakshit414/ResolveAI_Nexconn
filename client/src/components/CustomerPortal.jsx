@@ -6,7 +6,7 @@ import {
   ChevronUp
 } from 'lucide-react';
 import { DEMO_CUSTOMERS } from '../data/demoData';
-import { requestHumanAssistance } from '../services/api';
+import { requestHumanAssistance, getTicket } from '../services/api';
 import nexconnService from '../services/nexconnService';
 
 export default function CustomerPortal({ customer, onSelectCustomer, onMessageSent }) {
@@ -22,6 +22,7 @@ export default function CustomerPortal({ customer, onSelectCustomer, onMessageSe
     if (!customer) return;
 
     const channelId = customer.channelId || `channel_${customer.order.orderId}`;
+    const ticketId = customer.ticket?.id;
 
     nexconnService.connectUser({
       id: customer.id,
@@ -32,20 +33,34 @@ export default function CustomerPortal({ customer, onSelectCustomer, onMessageSe
     // 1. Load exact isolated channel history from nexconnService
     setMessages(nexconnService.getChannelMessages(channelId));
     
-    // 2. Set status
-    const isHandoff = customer.ticket.humanRequested || 
-      customer.ticket.status === 'Human Requested' || 
-      customer.ticket.status === 'Human Assistance Requested';
-    setHumanRequested(isHandoff);
-
-    const initialStatus = isHandoff
-      ? 'Human Requested'
-      : customer.ticket.status === 'Resolved'
-      ? 'Resolved'
-      : customer.ticket.status === 'Human Agent Active' || customer.ticket.status === 'In Progress'
-      ? 'Human Agent Active'
-      : 'AI Handling';
+    // 2. Set status from local store or demo defaults
+    const storedStatus = nexconnService.getTicketStatus(ticketId);
+    const initialStatus = storedStatus?.status || (
+      customer.ticket.humanRequested || customer.ticket.status === 'Human Requested'
+        ? 'Human Requested'
+        : customer.ticket.status === 'Resolved'
+        ? 'Resolved'
+        : customer.ticket.status === 'Human Agent Active' || customer.ticket.status === 'In Progress'
+        ? 'Human Agent Active'
+        : 'AI Handling'
+    );
+    
     setTicketStatus(initialStatus);
+    setHumanRequested(initialStatus === 'Human Requested' || initialStatus === 'Human Agent Active');
+
+    // Also fetch latest from backend
+    if (ticketId) {
+      getTicket(ticketId)
+        .then((res) => {
+          if (res?.ticket?.status) {
+            const beStatus = res.ticket.status;
+            setTicketStatus(beStatus);
+            setHumanRequested(beStatus === 'Human Requested' || beStatus === 'Human Agent Active');
+            nexconnService.setTicketStatus(ticketId, beStatus);
+          }
+        })
+        .catch(() => {});
+    }
 
     // 3. Subscribe ONLY to this customer's persistent channel
     const unsubscribe = nexconnService.subscribe(channelId, (newMsg) => {
@@ -56,8 +71,24 @@ export default function CustomerPortal({ customer, onSelectCustomer, onMessageSe
         return [...prev, newMsg];
       });
 
-      if (newMsg.senderRole === 'agent') {
-        setTicketStatus('Human Agent Active');
+      const msgTime = newMsg.timestamp ? new Date(newMsg.timestamp).getTime() : Date.now();
+      const isLive = (Date.now() - msgTime) < 30000;
+
+      let s = newMsg.metadata?.status;
+      if (!s && newMsg.text && isLive) {
+        if (newMsg.text.includes('requested human agent assistance') || newMsg.text.includes('requested human assistance')) {
+          s = 'Human Requested';
+        } else if (newMsg.text.includes('joined the conversation and taken over')) {
+          s = 'Human Agent Active';
+        } else if (newMsg.text.includes('marked as resolved')) {
+          s = 'Resolved';
+        }
+      }
+
+      if (s && isLive) {
+        setTicketStatus(s);
+        setHumanRequested(s === 'Human Requested' || s === 'Human Agent Active');
+        if (ticketId) nexconnService.setTicketStatus(ticketId, s);
       }
     });
 
@@ -107,12 +138,16 @@ export default function CustomerPortal({ customer, onSelectCustomer, onMessageSe
   };
 
   const handleRequestHuman = async () => {
-    if (humanRequested) return;
+    if (humanRequested || ticketStatus === 'Human Requested' || ticketStatus === 'Human Agent Active') return;
     try {
       setHumanRequested(true);
       setTicketStatus('Human Requested');
 
-      await requestHumanAssistance(customer.ticket.id);
+      const ticketId = customer.ticket?.id;
+      if (ticketId) {
+        nexconnService.setTicketStatus(ticketId, 'Human Requested');
+        await requestHumanAssistance(ticketId).catch(console.warn);
+      }
 
       const channelId = customer.channelId || `channel_${customer.order.orderId}`;
       const systemNotice = {
@@ -122,9 +157,26 @@ export default function CustomerPortal({ customer, onSelectCustomer, onMessageSe
         senderId: 'system',
         senderName: 'System',
         senderRole: 'system',
-        text: 'Human assistance has been requested. A support agent will connect with you shortly.',
+        text: 'Human assistance has been requested. Sarah Lin has been notified and will join this conversation shortly.',
         timestamp: new Date().toISOString(),
+        metadata: {
+          ticketId,
+          status: 'Human Requested',
+          type: 'STATUS_CHANGE',
+        },
       };
+
+      // Broadcast over real Nexconn connection to Agent Sarah
+      await nexconnService.sendMessage({
+        targetUserId: 'agent_sarah',
+        channelId,
+        text: `Customer requested human agent assistance for order #${customer.order.orderId}.`,
+        metadata: {
+          ticketId,
+          status: 'Human Requested',
+          type: 'STATUS_CHANGE',
+        },
+      });
 
       nexconnService.dispatchToChannel(channelId, systemNotice);
       setMessages(nexconnService.getChannelMessages(channelId));
@@ -216,24 +268,34 @@ export default function CustomerPortal({ customer, onSelectCustomer, onMessageSe
             </span>
 
             {/* Request Human Action */}
-            {!humanRequested ? (
+            {ticketStatus === 'Resolved' ? (
+              <span id="customer-status-badge-resolved" className="text-[11px] text-[#7CFF00] font-semibold px-2 py-0.5 rounded bg-[#7CFF00]/10 border border-[#7CFF00]/40">
+                Resolved
+              </span>
+            ) : ticketStatus === 'Human Agent Active' ? (
+              <span id="customer-status-badge-active" className="text-[11px] text-[#FFFFFF] font-semibold px-2 py-0.5 rounded bg-[#161616] border border-[#7CFF00]/40 flex items-center space-x-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#7CFF00] shadow-neon-sm" />
+                <span>Sarah Lin Active</span>
+              </span>
+            ) : ticketStatus === 'Human Requested' ? (
+              <span id="customer-status-badge-requested" className="text-[11px] text-[#FF334B] font-semibold px-2 py-0.5 rounded bg-[#250C10] border border-[#5C151F]">
+                Human Requested
+              </span>
+            ) : (
               <button
+                id="btn-request-human"
                 onClick={handleRequestHuman}
                 className="flex items-center space-x-1 px-2.5 py-1 rounded text-xs font-semibold bg-[#161616] hover:bg-[#202020] text-[#FFFFFF] border border-[#222222] hover:border-[#7CFF00]/40 transition-colors"
               >
                 <UserCheck className="w-3.5 h-3.5 text-[#7CFF00]" />
                 <span>Request Human</span>
               </button>
-            ) : (
-              <span className="text-[11px] text-[#FF334B] font-semibold px-2 py-0.5 rounded bg-[#250C10] border border-[#5C151F]">
-                Human Requested
-              </span>
             )}
           </div>
         </div>
 
         {/* Chat Messages Stream */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3.5 bg-[#090909]">
+        <div id="customer-chat-messages" className="flex-1 overflow-y-auto p-4 space-y-3.5 bg-[#090909]">
           {messages.map((msg) => {
             const isMe = msg.senderRole === 'customer' || msg.senderId === customer?.id;
             const isSystem = msg.senderRole === 'system';
@@ -298,7 +360,7 @@ export default function CustomerPortal({ customer, onSelectCustomer, onMessageSe
             type="text"
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
-            placeholder="Type your message..."
+            placeholder={ticketStatus === 'Resolved' ? "Inquiry resolved · Type a message to re-open..." : "Type your message..."}
             disabled={isSending}
             className="flex-1 bg-[#161616] border border-[#222222] focus:border-[#7CFF00] rounded px-3 py-2 text-xs text-[#FFFFFF] placeholder-[#8A8A8A] focus:outline-none transition-colors disabled:opacity-50"
           />

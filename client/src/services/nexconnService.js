@@ -1,4 +1,4 @@
-import { NCEngine } from '@nexconn/chat';
+import { NCEngine, DirectChannel, SendTextMessageParams } from '@nexconn/chat';
 import { getNexconnToken, getNexconnStatus } from './api.js';
 import { DEMO_CUSTOMERS } from '../data/demoData.js';
 
@@ -168,13 +168,58 @@ class NexconnManager {
             if (!rawMsg) return;
 
             // Extract channel identifier
-            const targetChannel = rawMsg.channelId || 
+            let targetChannel = rawMsg.channelId || 
               (rawMsg.metadata?.channelId) || 
               (rawMsg.orderId ? `channel_${rawMsg.orderId}` : null);
 
-            if (targetChannel) {
-              this.dispatchToChannel(targetChannel, rawMsg);
+            // If incoming message from remote SDK user, map to channel
+            if (!targetChannel) {
+              const sender = rawMsg.senderUserId || rawMsg.senderId;
+              const target = rawMsg.channelIdentifier?.channelId || rawMsg.targetUserId;
+              
+              if (sender && sender.startsWith('cust_')) {
+                targetChannel = this.getChannelId({ customerId: sender });
+              } else if (target && target.startsWith('cust_')) {
+                targetChannel = this.getChannelId({ customerId: target });
+              }
             }
+
+            if (!targetChannel) return;
+
+            // Extract message text whether from SDK Message or payload
+            let text = '';
+            if (rawMsg.content && typeof rawMsg.content === 'object') {
+              text = rawMsg.content.content || rawMsg.content.text || '';
+            } else if (typeof rawMsg.content === 'string') {
+              text = rawMsg.content;
+            } else {
+              text = rawMsg.text || '';
+            }
+
+            if (!text) return;
+
+            const senderId = rawMsg.senderUserId || rawMsg.senderId || 'customer';
+            const isAgent = (senderId && senderId.includes('agent')) || rawMsg.senderRole === 'agent';
+            const customerMatch = DEMO_CUSTOMERS.find(c => c.id === senderId);
+            const senderName = isAgent 
+              ? 'Sarah Lin' 
+              : (customerMatch?.name || rawMsg.senderName || 'Customer');
+
+            const canonicalMsg = {
+              id: rawMsg.messageId || rawMsg.id || `msg_${Date.now()}`,
+              messageId: rawMsg.messageId || rawMsg.id || `msg_${Date.now()}`,
+              channelId: targetChannel,
+              senderId,
+              senderName,
+              senderRole: isAgent ? 'agent' : 'customer',
+              senderAvatar: customerMatch?.avatar || rawMsg.senderAvatar,
+              targetUserId: rawMsg.channelIdentifier?.channelId || rawMsg.targetUserId,
+              text,
+              timestamp: rawMsg.sentTime ? new Date(rawMsg.sentTime).toISOString() : (rawMsg.timestamp || new Date().toISOString()),
+              metadata: rawMsg.metadata || {},
+            };
+
+            this.dispatchToChannel(targetChannel, canonicalMsg);
           },
           onOfflineMessageSyncCompleted: () => {
             console.log('[Nexconn] Offline message sync complete');
@@ -309,8 +354,8 @@ class NexconnManager {
 
       // Attempt live Nexconn SDK DirectChannel transmission if available
       try {
-        const DirectChannelClass = (typeof window !== 'undefined' && window.DirectChannel) || NCEngine?.DirectChannel;
-        if (DirectChannelClass && targetUserId) {
+        const DirectChannelClass = DirectChannel || (typeof window !== 'undefined' && window.DirectChannel);
+        if (DirectChannelClass && targetUserId && this.connected && this.token) {
           let channel = this.directChannels.get(targetUserId);
           if (!channel) {
             channel = new DirectChannelClass(targetUserId);
@@ -318,13 +363,14 @@ class NexconnManager {
           }
 
           if (channel && typeof channel.sendMessage === 'function') {
-            await channel.sendMessage({
-              messageParams: { text: trimmedText },
-            });
+            const params = SendTextMessageParams
+              ? new SendTextMessageParams({ content: trimmedText })
+              : { content: { content: trimmedText } };
+            await channel.sendMessage(params);
           }
         }
       } catch (sdkErr) {
-        console.log('[Nexconn] SDK DirectChannel dispatch note:', sdkErr.message);
+        console.warn('[Nexconn] SDK DirectChannel dispatch:', sdkErr.message || sdkErr);
       }
 
       // Dispatch to this channel ONLY (records in history & notifies only this channel's listeners)

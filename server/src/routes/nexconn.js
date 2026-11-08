@@ -35,7 +35,6 @@ router.post('/token', async (req, res) => {
 
   try {
     // Generate signature headers for Nexconn v4 API
-    // Headers typically include: App-Key, Nonce, Timestamp, Signature
     const nonce = Math.floor(Math.random() * 1000000).toString();
     const timestamp = Math.floor(Date.now() / 1000).toString();
     
@@ -45,13 +44,19 @@ router.post('/token', async (req, res) => {
       .update(`${appSecret}${nonce}${timestamp}`)
       .digest('hex');
 
+    const nexconnBaseUrl = process.env.NEXCONN_API_URL || 'https://api.sg-light-api.com';
+    const payload = {
+      userId,
+      name: name || userId,
+    };
+
+    if (avatar && typeof avatar === 'string' && avatar.startsWith('http')) {
+      payload.portraitUri = avatar;
+    }
+
     const response = await axios.post(
-      'https://api.nexconn.ai/v4/auth/access-token/issue',
-      {
-        userId,
-        name: name || userId,
-        portraitUri: avatar || '',
-      },
+      `${nexconnBaseUrl}/v4/auth/access-token/issue`,
+      payload,
       {
         headers: {
           'Content-Type': 'application/json',
@@ -64,11 +69,20 @@ router.post('/token', async (req, res) => {
       }
     );
 
+    const accessToken = 
+      response.data?.result?.accessToken || 
+      response.data?.token || 
+      response.data?.data?.token;
+
+    if (!accessToken) {
+      console.warn('Nexconn returned unexpected body:', response.data);
+    }
+
     return res.json({
       success: true,
       configured: true,
       appKey,
-      token: response.data?.token || response.data?.data?.token,
+      token: accessToken,
       userId,
       name,
     });
@@ -95,6 +109,7 @@ router.get('/status', (req, res) => {
     success: true,
     hasAppKey: Boolean(appKey && appKey.trim() !== '' && !appKey.includes('your_')),
     hasAppSecret: Boolean(appSecret && appSecret.trim() !== '' && !appSecret.includes('your_')),
+    appKey: appKey && !appKey.includes('your_') ? appKey : null,
     appKeyPrefix: appKey ? `${appKey.substring(0, 4)}...` : null,
   });
 });

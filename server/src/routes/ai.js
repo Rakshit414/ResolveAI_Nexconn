@@ -4,15 +4,28 @@ import { BUSINESS_INFO } from '../data/demoData.js';
 
 const router = express.Router();
 
-// Helper to get Gemini model if key is provided
-function getGeminiClient() {
+// Robust helper to call Gemini with automatic model failover (e.g. if 503 high demand spike)
+async function callGemini(prompt) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey || apiKey.trim() === '' || apiKey.includes('your_')) {
     return null;
   }
   const genAI = new GoogleGenerativeAI(apiKey);
-  const modelName = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
-  return genAI.getGenerativeModel({ model: modelName });
+  const primaryModel = process.env.GEMINI_MODEL || 'gemini-3.5-flash';
+  const modelsToTry = [primaryModel, 'gemini-3.5-flash-lite'];
+
+  for (const modelName of modelsToTry) {
+    try {
+      const model = genAI.getGenerativeModel({ model: modelName });
+      const result = await model.generateContent(prompt);
+      const text = result.response.text();
+      const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
+      return JSON.parse(cleaned);
+    } catch (err) {
+      console.warn(`Gemini [${modelName}] attempt note:`, err.message);
+    }
+  }
+  return null;
 }
 
 /**
@@ -29,8 +42,6 @@ router.post('/analyze', async (req, res) => {
   if (!messages || !Array.isArray(messages)) {
     return res.status(400).json({ success: false, error: 'messages array is required' });
   }
-
-  const model = getGeminiClient();
 
   const conversationText = messages
     .map(m => `${m.sender || m.senderName || 'User'}: ${m.text || m.content}`)
@@ -73,23 +84,14 @@ Return ONLY a valid JSON object matching this schema without markdown fences:
   "confidenceScore": 0.95
 }`;
 
-  if (model) {
-    try {
-      const prompt = `${systemPrompt}\n\nCustomer: ${customerContext}\nOrder Details:\n${orderContext}\n\nConversation History:\n${conversationText}\n\nJSON Output:`;
-      const result = await model.generateContent(prompt);
-      const text = result.response.text();
-      const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
-      const parsed = JSON.parse(cleaned);
-
-      return res.json({
-        success: true,
-        source: 'gemini',
-        data: parsed,
-      });
-    } catch (err) {
-      console.error('Gemini Classification Error:', err.message);
-      // Fallback with realistic analysis if Gemini call failed
-    }
+  const prompt = `${systemPrompt}\n\nCustomer: ${customerContext}\nOrder Details:\n${orderContext}\n\nConversation History:\n${conversationText}\n\nJSON Output:`;
+  const parsed = await callGemini(prompt);
+  if (parsed) {
+    return res.json({
+      success: true,
+      source: 'gemini',
+      data: parsed,
+    });
   }
 
   // Fallback heuristic classification when API key is not yet set
@@ -151,7 +153,6 @@ router.post('/summarize', async (req, res) => {
     return res.status(400).json({ success: false, error: 'messages array is required' });
   }
 
-  const model = getGeminiClient();
   const conversationText = messages
     .map(m => `${m.sender || m.senderName || 'User'}: ${m.text || m.content}`)
     .join('\n');
@@ -167,22 +168,14 @@ Generate a concise summary of the conversation in valid JSON without markdown fe
   "pendingAction": "What the support agent or business must do next"
 }`;
 
-  if (model) {
-    try {
-      const prompt = `${systemPrompt}\n\nCustomer: ${customer?.name || 'Customer'}\nOrder: ${orderContext}\n\nConversation:\n${conversationText}\n\nJSON Output:`;
-      const result = await model.generateContent(prompt);
-      const text = result.response.text();
-      const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
-      const parsed = JSON.parse(cleaned);
-
-      return res.json({
-        success: true,
-        source: 'gemini',
-        data: parsed,
-      });
-    } catch (err) {
-      console.error('Gemini Summarize Error:', err.message);
-    }
+  const prompt = `${systemPrompt}\n\nCustomer: ${customer?.name || 'Customer'}\nOrder: ${orderContext}\n\nConversation:\n${conversationText}\n\nJSON Output:`;
+  const parsed = await callGemini(prompt);
+  if (parsed) {
+    return res.json({
+      success: true,
+      source: 'gemini',
+      data: parsed,
+    });
   }
 
   // Fallback structured summary
@@ -212,7 +205,6 @@ router.post('/suggest-reply', async (req, res) => {
     return res.status(400).json({ success: false, error: 'messages array is required' });
   }
 
-  const model = getGeminiClient();
   const conversationText = messages
     .map(m => `${m.sender || m.senderName || 'User'}: ${m.text || m.content}`)
     .join('\n');
@@ -244,22 +236,14 @@ Return valid JSON without markdown fences:
   "confidenceScore": 0.94
 }`;
 
-  if (model) {
-    try {
-      const prompt = `${systemPrompt}\n\nCustomer: ${customer?.name || 'Customer'} (${customer?.email || 'N/A'})\nOrder Context:\n${JSON.stringify(order, null, 2)}\n\nConversation History:\n${conversationText}\n\nJSON Output:`;
-      const result = await model.generateContent(prompt);
-      const text = result.response.text();
-      const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
-      const parsed = JSON.parse(cleaned);
-
-      return res.json({
-        success: true,
-        source: 'gemini',
-        data: parsed,
-      });
-    } catch (err) {
-      console.error('Gemini Suggest Reply Error:', err.message);
-    }
+  const prompt = `${systemPrompt}\n\nCustomer: ${customer?.name || 'Customer'} (${customer?.email || 'N/A'})\nOrder Context:\n${JSON.stringify(order, null, 2)}\n\nConversation History:\n${conversationText}\n\nJSON Output:`;
+  const parsed = await callGemini(prompt);
+  if (parsed) {
+    return res.json({
+      success: true,
+      source: 'gemini',
+      data: parsed,
+    });
   }
 
   // Fallback response based on order context

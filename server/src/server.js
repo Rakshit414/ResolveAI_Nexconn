@@ -4,15 +4,17 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Ensure server/.env is loaded regardless of working directory
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
+dotenv.config();
+
 import ticketsRouter from './routes/tickets.js';
 import aiRouter from './routes/ai.js';
 import nexconnRouter from './routes/nexconn.js';
 import knowledgeRouter from './routes/knowledge.js';
-
-dotenv.config();
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 5000;

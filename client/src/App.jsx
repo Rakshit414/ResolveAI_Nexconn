@@ -18,7 +18,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#070B14] text-slate-100 flex flex-col font-sans">
+    <div className="min-h-screen bg-[#191A19] text-[#D5D9D3] flex flex-col font-sans">
       {/* Top Global Navigation Bar */}
       <Navbar
         currentCustomer={currentCustomer}
@@ -26,13 +26,13 @@ export default function App() {
         onOpenPolicies={() => setIsPoliciesOpen(true)}
       />
 
-      {/* Main Routed Content Area */}
+      {/* Main Content Area */}
       <main className="flex-1 overflow-hidden">
         <Routes>
           <Route
             path="/"
             element={
-              <div className="py-6 overflow-y-auto h-[calc(100vh-57px)]">
+              <div className="py-4 overflow-y-auto h-[calc(100vh-52px)]">
                 <CustomerPortal
                   customer={currentCustomer}
                   onSelectCustomer={handleSelectCustomer}
@@ -43,7 +43,7 @@ export default function App() {
           <Route
             path="/customer"
             element={
-              <div className="py-6 overflow-y-auto h-[calc(100vh-57px)]">
+              <div className="py-4 overflow-y-auto h-[calc(100vh-52px)]">
                 <CustomerPortal
                   customer={currentCustomer}
                   onSelectCustomer={handleSelectCustomer}
@@ -73,7 +73,7 @@ export default function App() {
         </Routes>
       </main>
 
-      {/* NovaCart Business Policies Drawer */}
+      {/* Policies Reference Drawer */}
       <PolicyDrawer
         isOpen={isPoliciesOpen}
         onClose={() => setIsPoliciesOpen(false)}

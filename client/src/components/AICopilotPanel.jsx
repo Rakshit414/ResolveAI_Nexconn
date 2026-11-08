@@ -1,17 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Sparkles, 
-  Bot, 
-  CheckCircle2, 
-  AlertTriangle, 
-  RefreshCw, 
   Send, 
   Edit3, 
-  FileText, 
+  RefreshCw, 
+  ChevronDown, 
+  ChevronUp, 
   ShieldCheck, 
-  HelpCircle,
-  ThumbsUp,
-  SlidersHorizontal
+  X,
+  Check
 } from 'lucide-react';
 import { analyzeConversation, summarizeConversation, getSuggestedReply } from '../services/api';
 
@@ -19,21 +16,19 @@ export default function AICopilotPanel({
   ticket,
   messages,
   onApproveAndSend,
-  onOpenPolicies,
+  onClose,
 }) {
   const [analysis, setAnalysis] = useState(null);
   const [summary, setSummary] = useState(null);
   const [suggestedReply, setSuggestedReply] = useState('');
   const [isEditingReply, setIsEditingReply] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [showFullAnalysis, setShowFullAnalysis] = useState(false);
   const [policyRefs, setPolicyRefs] = useState([]);
-  const [aiSource, setAiSource] = useState('gemini');
 
-  // Trigger AI analysis when ticket or messages change
   useEffect(() => {
     if (!ticket) return;
 
-    // Use initial ticket metadata if available
     setAnalysis({
       category: ticket.category,
       priority: ticket.priority,
@@ -57,7 +52,6 @@ export default function AICopilotPanel({
         : ['Supporting photograph required for incorrect items', 'Free expedited replacement']
     );
 
-    // Call live AI endpoints
     handleRunAICopilot();
   }, [ticket?.id]);
 
@@ -76,7 +70,6 @@ export default function AICopilotPanel({
         order: ticket.customer?.order,
       };
 
-      // Concurrent AI calls for analysis, summary, and suggestion
       const [analysisRes, summaryRes, replyRes] = await Promise.allSettled([
         analyzeConversation(payload),
         summarizeConversation(payload),
@@ -85,7 +78,6 @@ export default function AICopilotPanel({
 
       if (analysisRes.status === 'fulfilled' && analysisRes.value?.data) {
         setAnalysis(analysisRes.value.data);
-        if (analysisRes.value.source) setAiSource(analysisRes.value.source);
       }
 
       if (summaryRes.status === 'fulfilled' && summaryRes.value?.data) {
@@ -105,199 +97,162 @@ export default function AICopilotPanel({
     }
   };
 
-  const handleApprove = () => {
+  const handleSendReply = () => {
     if (!suggestedReply.trim()) return;
     onApproveAndSend(suggestedReply.trim());
   };
 
-  const getPriorityColor = (priority) => {
-    switch (priority?.toLowerCase()) {
-      case 'critical':
-        return 'text-red-400 bg-red-500/15 border-red-500/30';
-      case 'high':
-        return 'text-orange-400 bg-orange-500/15 border-orange-500/30';
-      case 'medium':
-        return 'text-amber-300 bg-amber-500/15 border-amber-500/30';
-      case 'low':
-      default:
-        return 'text-blue-400 bg-blue-500/15 border-blue-500/30';
-    }
-  };
-
-  const getSentimentBadge = (sentiment) => {
-    switch (sentiment?.toLowerCase()) {
-      case 'negative':
-        return 'text-red-400 bg-red-500/15 border-red-500/30';
-      case 'frustrated':
-        return 'text-orange-400 bg-orange-500/15 border-orange-500/30';
-      case 'positive':
-        return 'text-emerald-400 bg-emerald-500/15 border-emerald-500/30';
-      case 'neutral':
-      default:
-        return 'text-slate-300 bg-slate-800 border-slate-700';
-    }
-  };
+  const isUrgent = analysis?.priority?.toLowerCase() === 'critical' || analysis?.priority?.toLowerCase() === 'high';
 
   return (
-    <div className="flex flex-col h-full bg-[#0B1120] border-l border-slate-800 overflow-y-auto">
-      {/* Copilot Header */}
-      <div className="p-3.5 border-b border-slate-800 flex items-center justify-between bg-slate-900/60 sticky top-0 z-10 backdrop-blur-md">
+    <div className="flex flex-col h-full bg-[#111311] border-l border-[#353B35] overflow-y-auto">
+      {/* Header */}
+      <div className="px-4 py-3 border-b border-[#353B35] flex items-center justify-between shrink-0 bg-[#111311]">
         <div className="flex items-center space-x-2">
-          <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-brand-indigo to-brand-violet flex items-center justify-center text-white shadow-glow-sm">
-            <Sparkles className="w-4 h-4" />
-          </div>
-          <div>
-            <h3 className="font-bold text-xs text-white flex items-center space-x-1.5">
-              <span>AI Copilot</span>
-              <span className="text-[10px] font-normal px-1.5 py-0.2 rounded bg-brand-indigo/20 text-brand-indigo border border-brand-indigo/30">
-                {aiSource === 'gemini' ? 'Gemini 1.5' : 'Policy Engine'}
-              </span>
-            </h3>
-            <p className="text-[10px] text-slate-400">Real-time context & assistance</p>
-          </div>
+          <Sparkles className="w-3.5 h-3.5 text-[#174B35]" />
+          <span className="font-semibold text-xs text-[#D5D9D3]">AI Copilot</span>
         </div>
 
-        <button
-          onClick={handleRunAICopilot}
-          disabled={isLoading}
-          className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-750 transition-colors"
-          title="Refresh AI Analysis"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-brand-indigo' : ''}`} />
-        </button>
+        <div className="flex items-center space-x-1">
+          <button
+            onClick={handleRunAICopilot}
+            disabled={isLoading}
+            className="p-1.5 rounded text-[#929A91] hover:text-[#D5D9D3] transition-colors"
+            title="Refresh Copilot"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-[#174B35]' : ''}`} />
+          </button>
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded text-[#929A91] hover:text-[#D5D9D3] transition-colors"
+              title="Close Panel"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="p-4 space-y-4 flex-1">
-        {/* Card 1: Issue Classification */}
-        <div className="bg-slate-900/80 rounded-xl p-3.5 border border-slate-800 shadow-sm space-y-2.5">
+        
+        {/* A. Compact Issue Overview */}
+        <div className="bg-[#191A19] border border-[#353B35] rounded p-3 text-xs space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 flex items-center space-x-1.5">
-              <Bot className="w-3.5 h-3.5 text-brand-indigo" />
-              <span>Issue Classification</span>
+            <span className="text-[10px] uppercase font-semibold text-[#929A91]">Issue Overview</span>
+            <span className={`text-[10px] font-medium px-2 py-0.5 rounded border ${
+              isUrgent ? 'border-[#5C1721] bg-[#2A1316] text-[#A51F32]' : 'border-[#353B35] text-[#929A91]'
+            }`}>
+              {analysis?.priority || 'Normal'}
             </span>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <div className="p-2 rounded-lg bg-slate-950/80 border border-slate-850">
-              <span className="text-[10px] text-slate-500 uppercase font-semibold block">Category</span>
-              <span className="font-semibold text-slate-200 truncate block mt-0.5">
-                {analysis?.category || 'General Inquiry'}
-              </span>
+          <div className="grid grid-cols-2 gap-2 text-[11px] pt-1">
+            <div>
+              <span className="text-[#687267] block text-[10px]">Category</span>
+              <span className="text-[#D5D9D3] font-medium truncate block">{analysis?.category || 'Inquiry'}</span>
             </div>
-
-            <div className="p-2 rounded-lg bg-slate-950/80 border border-slate-850">
-              <span className="text-[10px] text-slate-500 uppercase font-semibold block">Priority</span>
-              <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border inline-block mt-0.5 ${getPriorityColor(analysis?.priority)}`}>
-                {analysis?.priority || 'Medium'}
-              </span>
-            </div>
-
-            <div className="col-span-2 p-2 rounded-lg bg-slate-950/80 border border-slate-850 flex items-center justify-between">
-              <span className="text-[10px] text-slate-500 uppercase font-semibold">Customer Sentiment</span>
-              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded border ${getSentimentBadge(analysis?.sentiment)}`}>
-                {analysis?.sentiment || 'Neutral'}
-              </span>
-            </div>
-          </div>
-
-          {analysis?.issueDescription && (
-            <p className="text-[11px] text-slate-300 bg-slate-950/60 p-2.5 rounded-lg border border-slate-850 leading-relaxed">
-              {analysis.issueDescription}
-            </p>
-          )}
-        </div>
-
-        {/* Card 2: AI Conversation Summary */}
-        <div className="bg-slate-900/80 rounded-xl p-3.5 border border-slate-800 shadow-sm space-y-2.5">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 flex items-center space-x-1.5">
-            <FileText className="w-3.5 h-3.5 text-brand-indigo" />
-            <span>Structured Summary</span>
-          </span>
-
-          <div className="space-y-2 text-xs">
-            <div className="border-l-2 border-brand-indigo pl-2 py-0.5">
-              <strong className="text-slate-400 text-[10px] uppercase block font-semibold">What Happened</strong>
-              <p className="text-slate-200 text-[11px] leading-relaxed">
-                {summary?.whatHappened || 'Analyzing initial customer message...'}
-              </p>
-            </div>
-
-            <div className="border-l-2 border-amber-400 pl-2 py-0.5">
-              <strong className="text-slate-400 text-[10px] uppercase block font-semibold">Customer Needs</strong>
-              <p className="text-slate-200 text-[11px] leading-relaxed">
-                {summary?.customerNeeds || 'Awaiting customer specifications.'}
-              </p>
-            </div>
-
-            <div className="border-l-2 border-purple-400 pl-2 py-0.5">
-              <strong className="text-slate-400 text-[10px] uppercase block font-semibold">Pending Action</strong>
-              <p className="text-slate-200 text-[11px] leading-relaxed">
-                {summary?.pendingAction || 'Agent review required.'}
-              </p>
+            <div>
+              <span className="text-[#687267] block text-[10px]">Sentiment</span>
+              <span className="text-[#D5D9D3] font-medium truncate block">{analysis?.sentiment || 'Neutral'}</span>
             </div>
           </div>
         </div>
 
-        {/* Card 3: Context-Aware Suggested Reply */}
-        <div className="bg-slate-900/80 rounded-xl p-3.5 border border-slate-800 shadow-sm space-y-2.5">
+        {/* B. Concise Conversation Summary */}
+        <div className="bg-[#191A19] border border-[#353B35] rounded p-3 text-xs space-y-2">
+          <span className="text-[10px] uppercase font-semibold text-[#929A91] block">Summary</span>
+          <div className="space-y-1.5 text-[11px] leading-relaxed">
+            <div>
+              <span className="text-[#687267] font-medium">Issue: </span>
+              <span className="text-[#D5D9D3]">{summary?.whatHappened || 'Analyzing issue...'}</span>
+            </div>
+            <div>
+              <span className="text-[#687267] font-medium">Customer Needs: </span>
+              <span className="text-[#D5D9D3]">{summary?.customerNeeds || 'Clarification.'}</span>
+            </div>
+            <div>
+              <span className="text-[#687267] font-medium">Pending Action: </span>
+              <span className="text-[#D5D9D3]">{summary?.pendingAction || 'Agent response.'}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* C. Suggested Response (Primary Focus of Copilot) */}
+        <div className="bg-[#242724] border border-[#353B35] rounded p-3.5 space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 flex items-center space-x-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+            <span className="text-xs font-semibold text-[#D5D9D3] flex items-center space-x-1.5">
               <span>Suggested Response</span>
             </span>
 
             <button
               onClick={() => setIsEditingReply(!isEditingReply)}
-              className="text-[11px] text-brand-indigo hover:text-white flex items-center space-x-1 font-medium transition-colors"
+              className="text-[11px] text-[#929A91] hover:text-[#D5D9D3] flex items-center space-x-1 transition-colors"
             >
               <Edit3 className="w-3 h-3" />
               <span>{isEditingReply ? 'Done' : 'Edit'}</span>
             </button>
           </div>
 
-          {/* Business Policy Checklist Badges */}
-          <div className="flex flex-wrap gap-1.5">
-            {policyRefs.map((pol, i) => (
-              <span
-                key={i}
-                className="text-[10px] bg-brand-indigo/15 text-indigo-300 border border-brand-indigo/30 px-2 py-0.5 rounded-full flex items-center space-x-1"
-              >
-                <ShieldCheck className="w-3 h-3 text-brand-indigo" />
-                <span className="truncate max-w-[200px]">{pol}</span>
-              </span>
-            ))}
-          </div>
-
-          {/* Editable Suggested Response Text */}
+          {/* Editable text area or formatted text */}
           {isEditingReply ? (
             <textarea
               value={suggestedReply}
               onChange={(e) => setSuggestedReply(e.target.value)}
               rows={5}
-              className="w-full bg-slate-950 border border-brand-indigo/60 rounded-xl p-3 text-xs text-white focus:outline-none focus:ring-1 focus:ring-brand-indigo leading-relaxed"
+              className="w-full bg-[#191A19] border border-[#353B35] focus:border-[#174B35] rounded p-2.5 text-xs text-[#D5D9D3] focus:outline-none leading-relaxed"
             />
           ) : (
-            <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-850 text-xs text-slate-200 leading-relaxed max-h-44 overflow-y-auto whitespace-pre-wrap">
-              {suggestedReply || 'Generating context-aware suggestion...'}
+            <div className="bg-[#191A19] border border-[#353B35] rounded p-2.5 text-xs text-[#D5D9D3] leading-relaxed max-h-48 overflow-y-auto whitespace-pre-wrap">
+              {suggestedReply || 'Drafting suggested reply based on customer context...'}
             </div>
           )}
 
-          {/* Primary Action Button: Approve and Send */}
-          <div className="pt-1">
-            <button
-              onClick={handleApprove}
-              disabled={!suggestedReply.trim() || isLoading}
-              className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-brand-indigo to-brand-violet hover:from-brand-blue hover:to-brand-indigo text-white text-xs font-semibold flex items-center justify-center space-x-2 shadow-glow-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>Approve and Send to Customer</span>
-            </button>
-          </div>
-
-          <div className="text-[10px] text-slate-500 text-center flex items-center justify-center space-x-1 pt-1">
-            <span>Human-in-the-loop: Agent verifies message before sending.</span>
-          </div>
+          {/* Send Reply Action Button */}
+          <button
+            onClick={handleSendReply}
+            disabled={!suggestedReply.trim() || isLoading}
+            className="w-full py-2 px-3 rounded bg-[#174B35] hover:bg-[#1F6246] text-[#D5D9D3] text-xs font-medium flex items-center justify-center space-x-1.5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Send className="w-3.5 h-3.5" />
+            <span>Send Reply</span>
+          </button>
         </div>
+
+        {/* D. Full Analysis (Expandable Section - Collapsed by Default) */}
+        <div className="border border-[#353B35] rounded bg-[#191A19] overflow-hidden">
+          <button
+            onClick={() => setShowFullAnalysis(!showFullAnalysis)}
+            className="w-full px-3 py-2 text-left text-xs font-medium text-[#929A91] hover:text-[#D5D9D3] flex items-center justify-between bg-[#191A19] hover:bg-[#242724] transition-colors"
+          >
+            <span>Full Analysis & Policy Context</span>
+            {showFullAnalysis ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+          </button>
+
+          {showFullAnalysis && (
+            <div className="p-3 border-t border-[#353B35] space-y-2.5 text-xs text-[#929A91] animate-fadeIn">
+              <div>
+                <span className="text-[10px] uppercase font-semibold text-[#687267] block">Detailed Context</span>
+                <p className="text-[#D5D9D3] text-[11px] leading-relaxed mt-0.5">
+                  {analysis?.issueDescription || 'No extended notes.'}
+                </p>
+              </div>
+
+              <div>
+                <span className="text-[10px] uppercase font-semibold text-[#687267] block">Applied Policies</span>
+                <div className="space-y-1 mt-1">
+                  {policyRefs.map((pol, i) => (
+                    <div key={i} className="flex items-center space-x-1.5 text-[11px] text-[#D5D9D3]">
+                      <ShieldCheck className="w-3 h-3 text-[#174B35] shrink-0" />
+                      <span>{pol}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
       </div>
     </div>
   );

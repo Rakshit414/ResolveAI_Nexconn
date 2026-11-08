@@ -1,23 +1,23 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Send, 
-  Package, 
-  CheckCircle2, 
-  Clock, 
   ChevronDown, 
   ChevronUp, 
-  ExternalLink,
-  ShieldAlert,
-  UserCheck,
-  Bot
+  Check, 
+  UserCheck, 
+  Bot,
+  PanelRightClose,
+  PanelRightOpen,
+  Package
 } from 'lucide-react';
-import nexconnService from '../services/nexconnService';
 
 export default function ChatWindow({
   ticket,
   messages,
   onSendMessage,
   onUpdateStatus,
+  isCopilotOpen,
+  onToggleCopilot,
 }) {
   const [inputText, setInputText] = useState('');
   const [showOrderDetails, setShowOrderDetails] = useState(false);
@@ -37,103 +37,136 @@ export default function ChatWindow({
   const customer = ticket?.customer;
   const order = customer?.order;
 
+  // Status mapping
+  const currentStatus = ticket?.status === 'Human Assistance Requested' || ticket?.status === 'Human Requested'
+    ? 'Human Requested'
+    : ticket?.status === 'In Progress' || ticket?.status === 'Human Agent Active'
+    ? 'Human Agent Active'
+    : ticket?.status === 'Resolved'
+    ? 'Resolved'
+    : 'AI Handling';
+
+  const isHandoffRequested = currentStatus === 'Human Requested';
+  const isAgentActive = currentStatus === 'Human Agent Active';
+  const isResolved = currentStatus === 'Resolved';
+
   return (
-    <div className="flex flex-col h-full bg-[#080D1A] overflow-hidden">
-      {/* Chat Window Header */}
-      <div className="px-5 py-3.5 bg-[#0B1120] border-b border-slate-800 flex items-center justify-between">
+    <div className="flex flex-col h-full bg-[#191A19] overflow-hidden">
+      {/* Workspace Header */}
+      <div className="px-5 py-3 bg-[#111311] border-b border-[#353B35] flex items-center justify-between shrink-0">
+        {/* Customer & Order Summary */}
         <div className="flex items-center space-x-3">
           <img
             src={customer?.avatar}
             alt={customer?.name}
-            className="w-10 h-10 rounded-full object-cover border border-slate-700"
+            className="w-8 h-8 rounded-full object-cover border border-[#353B35] grayscale"
           />
           <div>
             <div className="flex items-center space-x-2">
-              <h2 className="font-bold text-sm text-white">{customer?.name}</h2>
-              <span className="font-mono text-xs text-slate-400 bg-slate-800 px-2 py-0.5 rounded border border-slate-750">
-                {ticket?.orderId}
+              <span className="font-semibold text-xs text-[#D5D9D3]">{customer?.name}</span>
+              <span className="text-[11px] text-[#929A91] font-mono">({ticket?.orderId})</span>
+              
+              {/* Minimal Status Indicator */}
+              <span className={`text-[10px] font-medium px-2 py-0.5 rounded border ${
+                isHandoffRequested
+                  ? 'border-[#5C1721] bg-[#2A1316] text-[#A51F32]'
+                  : isResolved
+                  ? 'border-[#235D43] bg-[#142E22] text-[#D5D9D3]'
+                  : isAgentActive
+                  ? 'border-[#353B35] bg-[#242724] text-[#D5D9D3]'
+                  : 'border-[#353B35] text-[#929A91]'
+              }`}>
+                {currentStatus}
               </span>
             </div>
-            <div className="flex items-center space-x-2 text-xs text-slate-400 mt-0.5">
-              <span>{customer?.email}</span>
+
+            <div className="flex items-center space-x-2 text-[11px] text-[#929A91] mt-0.5">
+              <span>{order?.product}</span>
               <span>·</span>
-              <span className="text-slate-300 font-medium">{order?.product}</span>
+              <button
+                onClick={() => setShowOrderDetails(!showOrderDetails)}
+                className="text-[#929A91] hover:text-[#D5D9D3] underline flex items-center space-x-0.5 transition-colors"
+              >
+                <span>{showOrderDetails ? 'Hide details' : 'Order details'}</span>
+                {showOrderDetails ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+              </button>
             </div>
           </div>
         </div>
 
-        {/* Action Controls: Ticket Resolution State */}
+        {/* Action Controls: Take Over / Resolve / Toggle Copilot */}
         <div className="flex items-center space-x-2">
-          {ticket?.status !== 'In Progress' && ticket?.status !== 'Resolved' && (
+          {/* Take Over Button when human requested */}
+          {isHandoffRequested && (
             <button
-              onClick={() => onUpdateStatus('In Progress')}
-              className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-brand-indigo/20 hover:bg-brand-indigo/30 text-brand-indigo border border-brand-indigo/30 transition-colors"
+              onClick={() => onUpdateStatus('Human Agent Active')}
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded text-xs font-medium bg-[#174B35] hover:bg-[#1F6246] text-[#D5D9D3] transition-colors"
             >
-              Take Over (In Progress)
+              <UserCheck className="w-3.5 h-3.5" />
+              <span>Take Over</span>
             </button>
           )}
 
-          {ticket?.status !== 'Resolved' ? (
+          {/* Mark Resolved Action */}
+          {!isResolved ? (
             <button
               onClick={() => onUpdateStatus('Resolved')}
-              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 transition-colors"
+              className="flex items-center space-x-1 px-2.5 py-1.5 rounded text-xs text-[#929A91] hover:text-[#D5D9D3] bg-[#242724] hover:bg-[#2E332E] border border-[#353B35] transition-colors"
             >
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>Mark Resolved</span>
+              <Check className="w-3.5 h-3.5" />
+              <span>Resolve</span>
             </button>
           ) : (
-            <span className="flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>Resolved</span>
+            <span className="text-xs text-[#929A91] px-2 py-1 bg-[#242724] rounded border border-[#353B35]">
+              Resolved
             </span>
           )}
 
+          {/* Toggle AI Copilot Panel */}
           <button
-            onClick={() => setShowOrderDetails(!showOrderDetails)}
-            className="p-1.5 text-slate-400 hover:text-white rounded-lg bg-slate-800 border border-slate-700 transition-colors"
-            title="Toggle Order Context"
+            onClick={onToggleCopilot}
+            className={`p-1.5 rounded text-[#929A91] hover:text-[#D5D9D3] border border-[#353B35] transition-colors ${
+              isCopilotOpen ? 'bg-[#242724]' : 'bg-[#191A19]'
+            }`}
+            title={isCopilotOpen ? 'Collapse AI Copilot' : 'Expand AI Copilot'}
           >
-            {showOrderDetails ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            {isCopilotOpen ? <PanelRightClose className="w-4 h-4" /> : <PanelRightOpen className="w-4 h-4" />}
           </button>
         </div>
       </div>
 
-      {/* Expandable Order Details Drawer */}
+      {/* Collapsible Order Information Banner */}
       {showOrderDetails && order && (
-        <div className="p-4 bg-slate-900 border-b border-slate-800 text-xs text-slate-300 animate-fadeIn grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="px-5 py-3 bg-[#111311] border-b border-[#353B35] text-xs text-[#929A91] grid grid-cols-2 md:grid-cols-4 gap-4 animate-fadeIn">
           <div>
-            <span className="text-slate-500 block text-[10px] uppercase font-semibold">Product</span>
-            <span className="font-semibold text-white">{order.product}</span>
+            <span className="block text-[10px] uppercase font-semibold text-[#687267]">Item Ordered</span>
+            <span className="text-[#D5D9D3] font-medium">{order.product}</span>
           </div>
           <div>
-            <span className="text-slate-500 block text-[10px] uppercase font-semibold">Delivery Status</span>
-            <span className="font-semibold text-amber-400">{order.status}</span>
+            <span className="block text-[10px] uppercase font-semibold text-[#687267]">Delivery Status</span>
+            <span className="text-[#D5D9D3] font-medium">{order.status}</span>
           </div>
           <div>
-            <span className="text-slate-500 block text-[10px] uppercase font-semibold">Carrier / Tracking</span>
-            <span className="font-mono text-slate-200">{order.carrier} ({order.trackingNumber})</span>
+            <span className="block text-[10px] uppercase font-semibold text-[#687267]">Carrier & Tracking</span>
+            <span className="text-[#D5D9D3] font-mono">{order.carrier} · {order.trackingNumber}</span>
           </div>
           <div>
-            <span className="text-slate-500 block text-[10px] uppercase font-semibold">Order Placed</span>
-            <span className="text-slate-200">{order.purchaseDate} (${order.price.toFixed(2)})</span>
-          </div>
-          <div className="col-span-2 md:col-span-4 bg-slate-950 p-2.5 rounded-lg border border-slate-800 text-[11px]">
-            <strong className="text-slate-400">Logistics Detail: </strong>
-            <span className="text-slate-300">{order.trackingStatus}</span>
+            <span className="block text-[10px] uppercase font-semibold text-[#687267]">Order Date & Price</span>
+            <span className="text-[#D5D9D3]">{order.purchaseDate} (${order.price.toFixed(2)})</span>
           </div>
         </div>
       )}
 
-      {/* Messages Stream */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3.5">
+      {/* Messages Stream - Generous readable spacing */}
+      <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
         {messages.map((msg) => {
           const isAgent = msg.senderRole === 'agent' || msg.senderId === 'agent_sarah';
           const isSystem = msg.senderRole === 'system';
 
           if (isSystem) {
             return (
-              <div key={msg.id} className="flex justify-center my-2">
-                <div className="px-3 py-1 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300">
+              <div key={msg.id} className="flex justify-center my-3">
+                <div className="px-3 py-1 rounded bg-[#242724] border border-[#353B35] text-[11px] text-[#929A91]">
                   {msg.text}
                 </div>
               </div>
@@ -143,72 +176,50 @@ export default function ChatWindow({
           return (
             <div
               key={msg.id}
-              className={`flex items-end space-x-2.5 ${isAgent ? 'justify-end' : 'justify-start'}`}
+              className={`flex flex-col ${isAgent ? 'items-end' : 'items-start'}`}
             >
-              {!isAgent && (
-                <img
-                  src={customer?.avatar}
-                  alt={customer?.name}
-                  className="w-7 h-7 rounded-full object-cover border border-slate-700 shrink-0 mb-1"
-                />
-              )}
-
-              <div
-                className={`max-w-[75%] rounded-2xl px-4 py-2.5 shadow-md ${
-                  isAgent
-                    ? 'bg-gradient-to-r from-brand-indigo to-brand-violet text-white rounded-br-sm'
-                    : 'bg-slate-850 border border-slate-750 text-slate-100 rounded-bl-sm'
-                }`}
-              >
-                <div className="flex items-center justify-between space-x-2 mb-1">
-                  <span className="text-[11px] font-semibold text-slate-300">
-                    {isAgent ? 'You (Sarah Lin)' : customer?.name}
-                  </span>
-                  {msg.metadata?.aiAssisted && (
-                    <span className="text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.2 rounded bg-purple-500/30 text-purple-200 border border-purple-400/30 flex items-center space-x-1">
-                      <Bot className="w-2.5 h-2.5" />
-                      <span>AI Copilot</span>
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs leading-relaxed whitespace-pre-wrap">{msg.text}</p>
-                <div
-                  className={`text-[10px] mt-1 text-right ${
-                    isAgent ? 'text-indigo-200/80' : 'text-slate-400'
-                  }`}
-                >
+              {/* Message Meta Info */}
+              <div className="flex items-center space-x-2 mb-1 px-1 text-[11px] text-[#929A91]">
+                <span className="font-medium text-[#D5D9D3]">
+                  {isAgent ? 'Sarah Lin' : customer?.name}
+                </span>
+                <span>·</span>
+                <span className="font-mono text-[10px]">
                   {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </div>
+                </span>
               </div>
 
-              {isAgent && (
-                <img
-                  src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80"
-                  alt="Sarah Lin"
-                  className="w-7 h-7 rounded-full object-cover border border-brand-indigo shrink-0 mb-1"
-                />
-              )}
+              {/* Message Bubble */}
+              <div
+                className={`max-w-[75%] rounded-md px-4 py-2.5 text-xs leading-relaxed ${
+                  isAgent
+                    ? 'bg-[#142E22] border border-[#235D43] text-[#D5D9D3]'
+                    : 'bg-[#242724] border border-[#353B35] text-[#D5D9D3]'
+                }`}
+              >
+                <p className="whitespace-pre-wrap">{msg.text}</p>
+              </div>
             </div>
           );
         })}
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Manual Message Input Composer */}
-      <form onSubmit={handleSend} className="p-3 bg-[#0B1120] border-t border-slate-800 flex items-center space-x-2">
+      {/* Fixed Message Composer at bottom */}
+      <form onSubmit={handleSend} className="p-3 bg-[#111311] border-t border-[#353B35] flex items-center space-x-2 shrink-0">
         <input
           type="text"
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
-          placeholder={`Reply to ${customer?.name || 'customer'} directly...`}
-          className="flex-1 bg-slate-900 border border-slate-800 focus:border-brand-indigo rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none transition-colors"
+          placeholder={`Reply to ${customer?.name || 'customer'}...`}
+          className="flex-1 bg-[#191A19] border border-[#353B35] focus:border-[#174B35] rounded px-3.5 py-2 text-xs text-[#D5D9D3] placeholder-[#929A91] focus:outline-none transition-colors"
         />
         <button
           type="submit"
           disabled={!inputText.trim()}
-          className="px-4 py-2.5 rounded-xl bg-brand-indigo hover:bg-brand-violet text-white text-xs font-semibold flex items-center space-x-1.5 transition-all shadow-glow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+          className="px-4 py-2 rounded bg-[#174B35] hover:bg-[#1F6246] text-[#D5D9D3] text-xs font-medium flex items-center space-x-1.5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
         >
-          <span>Send Reply</span>
+          <span>Send</span>
           <Send className="w-3.5 h-3.5" />
         </button>
       </form>

@@ -25,8 +25,8 @@ router.get('/', (req, res) => {
   }
 
   if (status && status !== 'All') {
-    if (status === 'Human Assistance Requested') {
-      filtered = filtered.filter(t => t.humanRequested || t.status === 'Human Assistance Requested');
+    if (status === 'Human Assistance Requested' || status === 'Human Requested') {
+      filtered = filtered.filter(t => t.humanRequested || t.status === 'Human Requested' || t.status === 'Human Assistance Requested');
     } else {
       filtered = filtered.filter(t => t.status.toLowerCase() === status.toLowerCase());
     }
@@ -81,7 +81,7 @@ router.post('/:id/human-handoff', (req, res) => {
   }
 
   tickets[index].humanRequested = true;
-  tickets[index].status = 'Human Assistance Requested';
+  tickets[index].status = 'Human Requested';
   tickets[index].lastUpdated = new Date().toISOString();
 
   res.json({

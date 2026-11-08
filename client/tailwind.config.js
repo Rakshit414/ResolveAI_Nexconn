@@ -7,30 +7,45 @@ export default {
   theme: {
     extend: {
       colors: {
-        navy: {
-          950: '#060A13',
-          900: '#0B1120',
-          850: '#0F172A',
-          800: '#151F38',
-          750: '#1C294B',
-          700: '#23335D',
-          600: '#33487C',
+        // Brand permanent colour system
+        charcoal: {
+          DEFAULT: '#191A19', // Main background
+          deep: '#111311',    // Navigation and sidebar background
+          elevated: '#242724',// Cards and elevated panels
+          surface: '#1E211E', // Secondary surface
         },
-        brand: {
-          blue: '#3B82F6',
-          indigo: '#6366F1',
-          violet: '#8B5CF6',
-          purple: '#A855F7',
-          cyan: '#06B6D4',
+        forest: {
+          DEFAULT: '#174B35', // Primary interactions and active elements
+          hover: '#1F6246',   // Hover state
+          active: '#133D2B',  // Active pressed state
+          subtle: '#142E22',  // Subtle background highlight
+          border: '#235D43',  // Active border
+        },
+        crimson: {
+          DEFAULT: '#A51F32', // Critical alerts and urgent states
+          hover: '#BE253B',   // Hover state
+          subtle: '#2A1316',  // Subtle background for critical
+          border: '#5C1721',  // Border for critical
+        },
+        txt: {
+          primary: '#D5D9D3', // Primary main content text
+          muted: '#929A91',   // Secondary muted information
+          dim: '#687267',     // Dim helper text
+        },
+        subtle: {
+          border: '#353B35',  // Dividers and card borders
+          divider: '#2A302A', // Lighter divider
         }
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
       },
-      boxShadow: {
-        'glow-sm': '0 0 15px -3px rgba(99, 102, 241, 0.25)',
-        'glow-md': '0 0 25px -5px rgba(99, 102, 241, 0.35)',
-        'glow-blue': '0 0 20px -5px rgba(59, 130, 246, 0.3)',
+      borderRadius: {
+        'sm': '4px',
+        'DEFAULT': '6px',
+        'md': '8px',
+        'lg': '10px',
+        'xl': '12px',
       }
     },
   },

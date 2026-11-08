@@ -1,13 +1,5 @@
 import React from 'react';
-import { 
-  Search, 
-  Flame, 
-  AlertTriangle, 
-  Clock, 
-  CheckCircle2, 
-  UserCheck, 
-  Tag
-} from 'lucide-react';
+import { Search } from 'lucide-react';
 
 export default function ConversationInbox({
   tickets,
@@ -18,69 +10,61 @@ export default function ConversationInbox({
   searchQuery,
   onSearchChange,
 }) {
-  // Filter tabs
   const filters = [
     { id: 'All', label: 'All' },
-    { id: 'High Priority', label: 'High Priority', icon: Flame },
-    { id: 'Human Assistance Requested', label: 'Human Requested', icon: UserCheck },
-    { id: 'Resolved', label: 'Resolved', icon: CheckCircle2 },
+    { id: 'High Priority', label: 'High Priority' },
+    { id: 'Human Requested', label: 'Human Requested' },
+    { id: 'Resolved', label: 'Resolved' },
   ];
 
-  // Helper for priority styling
-  const getPriorityBadge = (priority) => {
-    switch (priority?.toLowerCase()) {
-      case 'critical':
-        return 'bg-red-500/15 text-red-400 border-red-500/30';
-      case 'high':
-        return 'bg-orange-500/15 text-orange-400 border-orange-500/30';
-      case 'medium':
-        return 'bg-amber-500/15 text-amber-300 border-amber-500/30';
-      case 'low':
-      default:
-        return 'bg-blue-500/15 text-blue-400 border-blue-500/30';
-    }
+  // Minimal priority indicator (Crimson Red for urgent/critical/high)
+  const isUrgent = (priority) => {
+    const p = priority?.toLowerCase();
+    return p === 'critical' || p === 'high';
   };
 
-  // Helper for sentiment indicator
-  const getSentimentDot = (sentiment) => {
-    switch (sentiment?.toLowerCase()) {
-      case 'negative':
-        return 'bg-red-500';
-      case 'frustrated':
-        return 'bg-orange-500';
-      case 'positive':
-        return 'bg-emerald-500';
-      case 'neutral':
-      default:
-        return 'bg-slate-400';
+  // Status text formatting
+  const formatStatus = (status) => {
+    if (status === 'Human Assistance Requested' || status === 'Human Requested') {
+      return 'Human Requested';
     }
+    if (status === 'In Progress' || status === 'Human Agent Active') {
+      return 'Human Agent Active';
+    }
+    if (status === 'Open' || status === 'AI Handling') {
+      return 'AI Handling';
+    }
+    if (status === 'Resolved') {
+      return 'Resolved';
+    }
+    return status || 'AI Handling';
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#0B1120] border-r border-slate-800">
-      {/* Inbox Search Bar */}
-      <div className="p-3 border-b border-slate-800">
+    <div className="flex flex-col h-full bg-[#111311] border-r border-[#353B35]">
+      {/* Search Input */}
+      <div className="p-3 border-b border-[#353B35] space-y-2.5">
         <div className="relative">
-          <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+          <Search className="w-3.5 h-3.5 text-[#929A91] absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="Search tickets, customers, orders..."
-            className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-brand-indigo transition-colors"
+            placeholder="Search conversations..."
+            className="w-full bg-[#191A19] border border-[#353B35] rounded pl-8 pr-3 py-1.5 text-xs text-[#D5D9D3] placeholder-[#929A91] focus:outline-none focus:border-[#174B35] transition-colors"
           />
         </div>
 
-        {/* Filter Pills */}
-        <div className="flex items-center space-x-1 mt-2.5 overflow-x-auto no-scrollbar">
+        {/* Minimal Filter Tabs */}
+        <div className="flex items-center space-x-1 overflow-x-auto no-scrollbar">
           {filters.map((f) => (
             <button
               key={f.id}
               onClick={() => onSelectFilter(f.id)}
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-medium whitespace-nowrap transition-all ${
+              className={`px-2 py-1 rounded text-[11px] font-medium whitespace-nowrap transition-colors ${
                 activeFilter === f.id
-                  ? 'bg-brand-indigo text-white shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                  ? 'bg-[#174B35] text-[#D5D9D3]'
+                  : 'text-[#929A91] hover:text-[#D5D9D3] hover:bg-[#1E211E]'
               }`}
             >
               {f.label}
@@ -89,77 +73,75 @@ export default function ConversationInbox({
         </div>
       </div>
 
-      {/* Ticket List */}
-      <div className="flex-1 overflow-y-auto divide-y divide-slate-850/80">
+      {/* Conversation List */}
+      <div className="flex-1 overflow-y-auto divide-y divide-[#353B35]/40">
         {tickets.length === 0 ? (
-          <div className="p-6 text-center text-slate-500 text-xs">
-            No conversations match your filter criteria.
+          <div className="p-6 text-center text-[#929A91] text-xs">
+            No conversations match this filter.
           </div>
         ) : (
           tickets.map((t) => {
             const isSelected = selectedTicket?.id === t.id;
+            const urgent = isUrgent(t.priority);
+            const statusLabel = formatStatus(t.status);
+
             return (
               <button
                 key={t.id}
                 onClick={() => onSelectTicket(t)}
-                className={`w-full text-left p-3.5 transition-all flex items-start space-x-3 ${
+                className={`w-full text-left p-3 transition-colors flex items-start space-x-2.5 border-l-2 ${
                   isSelected
-                    ? 'bg-slate-850/90 border-l-4 border-brand-indigo'
-                    : 'hover:bg-slate-850/40'
+                    ? 'bg-[#191A19] border-l-[#174B35]'
+                    : 'border-l-transparent hover:bg-[#191A19]/50'
                 }`}
               >
-                <div className="relative shrink-0">
+                {/* Subtle Customer Avatar */}
+                <div className="relative shrink-0 mt-0.5">
                   <img
                     src={t.customer?.avatar}
                     alt={t.customer?.name}
-                    className="w-9 h-9 rounded-full object-cover border border-slate-700"
+                    className="w-7 h-7 rounded-full object-cover border border-[#353B35] grayscale"
                   />
-                  <span
-                    className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ring-2 ring-[#0B1120] ${getSentimentDot(
-                      t.sentiment
-                    )}`}
-                    title={`Customer Sentiment: ${t.sentiment}`}
-                  />
+                  {/* Minimal priority dot if urgent */}
+                  {urgent && (
+                    <span 
+                      className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-[#A51F32]" 
+                      title={`${t.priority} Priority`}
+                    />
+                  )}
                 </div>
 
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold text-xs text-white truncate">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-medium text-[#D5D9D3] truncate">
                       {t.customer?.name}
                     </span>
-                    <span className="text-[10px] text-slate-500 font-mono">
-                      {t.orderId}
+                    <span className="text-[10px] text-[#929A91] shrink-0 font-mono">
+                      {new Date(t.lastUpdated || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
 
-                  <div className="text-[11px] text-slate-300 font-medium truncate mt-0.5">
-                    {t.customer?.order?.reportedIssue || t.category}
-                  </div>
-
-                  <p className="text-[11px] text-slate-400 line-clamp-1 mt-0.5">
-                    {t.customer?.order?.initialMessage}
+                  <p className="text-[11px] text-[#929A91] truncate mt-0.5 leading-snug">
+                    {t.customer?.order?.initialMessage || t.customer?.order?.reportedIssue}
                   </p>
 
-                  {/* Badges */}
-                  <div className="flex items-center space-x-1.5 mt-2">
-                    <span
-                      className={`text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded border ${getPriorityBadge(
-                        t.priority
-                      )}`}
-                    >
-                      {t.priority}
+                  {/* Clean minimal metadata line */}
+                  <div className="flex items-center justify-between mt-1.5 text-[10px]">
+                    <span className="text-[#929A91] font-mono">
+                      {t.orderId}
                     </span>
 
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-750">
-                      {t.category}
+                    <span className={`font-medium ${
+                      statusLabel === 'Human Requested'
+                        ? 'text-[#A51F32]'
+                        : statusLabel === 'Resolved'
+                        ? 'text-[#174B35]'
+                        : statusLabel === 'Human Agent Active'
+                        ? 'text-[#D5D9D3]'
+                        : 'text-[#929A91]'
+                    }`}>
+                      {statusLabel}
                     </span>
-
-                    {t.humanRequested && (
-                      <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center space-x-1">
-                        <UserCheck className="w-2.5 h-2.5" />
-                        <span>Handoff</span>
-                      </span>
-                    )}
                   </div>
                 </div>
               </button>

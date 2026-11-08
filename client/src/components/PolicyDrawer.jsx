@@ -1,81 +1,65 @@
 import React from 'react';
-import { X, ShieldAlert, CheckCircle2, BookOpen, AlertTriangle } from 'lucide-react';
+import { X, BookOpen, Check } from 'lucide-react';
 import { BUSINESS_INFO } from '../data/demoData';
 
 export default function PolicyDrawer({ isOpen, onClose }) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden bg-black/60 backdrop-blur-sm flex justify-end animate-fadeIn">
+    <div className="fixed inset-0 z-50 overflow-hidden bg-black/60 backdrop-blur-sm flex justify-end">
       <div 
-        className="w-full max-w-md bg-[#0D1527] border-l border-slate-850 h-full overflow-y-auto flex flex-col shadow-2xl p-6"
+        className="w-full max-w-md bg-[#111311] border-l border-[#353B35] h-full overflow-y-auto flex flex-col p-5 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-slate-800">
-          <div className="flex items-center space-x-2.5">
-            <div className="w-8 h-8 rounded-lg bg-brand-indigo/20 flex items-center justify-center text-brand-indigo">
-              <BookOpen className="w-4 h-4" />
-            </div>
-            <div>
-              <h2 className="text-base font-bold text-white">NovaCart Knowledge Base</h2>
-              <p className="text-xs text-slate-400">Business Rules & AI Guardrails</p>
-            </div>
+        <div className="flex items-center justify-between pb-3 border-b border-[#353B35]">
+          <div className="flex items-center space-x-2">
+            <BookOpen className="w-4 h-4 text-[#174B35]" />
+            <span className="font-semibold text-xs text-[#D5D9D3]">NovaCart Business Policies</span>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            className="p-1 rounded text-[#929A91] hover:text-[#D5D9D3] transition-colors"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* AI Guardrail Warning Alert */}
-        <div className="mt-4 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200">
-          <div className="flex items-start space-x-2">
-            <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
-            <div>
-              <strong className="font-semibold text-amber-300">Mandatory AI Guardrail:</strong>
-              <p className="mt-0.5 text-slate-300">
-                Resolve AI never automatically promises refunds, financial compensation, or unconfirmed delivery dates without verified supporting information.
-              </p>
-            </div>
-          </div>
+        {/* AI Guardrail Callout */}
+        <div className="mt-3.5 p-3 rounded bg-[#242724] border border-[#353B35] text-xs">
+          <strong className="text-[#D5D9D3] font-semibold block">AI Copilot Guardrail</strong>
+          <p className="mt-0.5 text-[#929A91] leading-relaxed text-[11px]">
+            The AI assistant will not promise unverified refunds, financial compensation, or unconfirmed delivery dates without supporting verification.
+          </p>
         </div>
 
         {/* Policies List */}
-        <div className="mt-5 space-y-3.5 flex-1">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-            Active Retail Policies
-          </h3>
+        <div className="mt-4 space-y-2.5 flex-1">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-[#929A91] block">
+            Retail Operations Rules
+          </span>
 
           {BUSINESS_INFO.policies.map((p, idx) => (
             <div
               key={p.id}
-              className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 transition-colors"
+              className="p-3 rounded bg-[#191A19] border border-[#353B35] text-xs space-y-1"
             >
-              <div className="flex items-center space-x-2 mb-1.5">
-                <span className="w-5 h-5 rounded-full bg-brand-indigo/20 text-brand-indigo text-[11px] font-bold flex items-center justify-center">
-                  {idx + 1}
-                </span>
-                <span className="text-xs font-semibold text-white">{p.topic}</span>
+              <div className="flex items-center space-x-2">
+                <span className="text-[10px] text-[#929A91] font-mono">0{idx + 1}.</span>
+                <span className="font-medium text-[#D5D9D3]">{p.topic}</span>
               </div>
-              <p className="text-xs text-slate-300 leading-relaxed pl-7">{p.rule}</p>
-              <div className="mt-2 pl-7 pt-2 border-t border-slate-800/80 flex items-start space-x-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
-                <span className="text-[11px] text-slate-400">
-                  <strong className="text-slate-300">Agent Action:</strong> {p.actionGuideline}
-                </span>
+              <p className="text-[#929A91] text-[11px] leading-relaxed pl-5">{p.rule}</p>
+              <div className="pl-5 pt-1 text-[10px] text-[#687267]">
+                Guideline: {p.actionGuideline}
               </div>
             </div>
           ))}
         </div>
 
-        {/* Footer info */}
-        <div className="mt-6 pt-4 border-t border-slate-800 text-[11px] text-slate-400">
-          <p>Support Hotline: <span className="text-slate-200">{BUSINESS_INFO.supportPhone}</span></p>
-          <p>Email: <span className="text-slate-200">{BUSINESS_INFO.supportEmail}</span></p>
-          <p className="mt-1 text-slate-500">Demo Retail Environment for Nexconn Build Challenge</p>
+        {/* Footer */}
+        <div className="mt-4 pt-3 border-t border-[#353B35] text-[10px] text-[#687267] flex items-center justify-between">
+          <span>NovaCart Operations</span>
+          <span>support@novacart.demo</span>
         </div>
       </div>
     </div>

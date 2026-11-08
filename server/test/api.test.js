@@ -55,7 +55,7 @@ async function runTests() {
   // 5. Human handoff
   await test('POST /api/tickets/tkt_1022/human-handoff updates status', async () => {
     const res = await axios.post(`${BASE_URL}/api/tickets/tkt_1022/human-handoff`);
-    if (res.data?.ticket?.status !== 'Human Assistance Requested') {
+    if (res.data?.ticket?.status !== 'Human Requested' && res.data?.ticket?.status !== 'Human Assistance Requested') {
       throw new Error('Human assistance requested status not set');
     }
   });

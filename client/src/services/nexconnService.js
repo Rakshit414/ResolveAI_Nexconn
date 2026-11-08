@@ -241,10 +241,14 @@ class NexconnManager {
    * Connect an authenticated user to Nexconn
    */
   async connectUser(user) {
-    if (this.currentUser && this.currentUser.id !== user.id) {
-      console.log(`[Nexconn] Switching user from ${this.currentUser.id} to ${user.id}`);
-      await this.disconnect();
+    if (!user) return { connected: false };
+    if (this.currentUser?.id === user.id && this.connected) {
+      return { connected: true, liveNetwork: Boolean(this.token), user };
     }
+    
+    // In Split View, multiple components (Customer & Agent) may share the engine session.
+    // Avoid tearing down the active SDK socket if we are already connected.
+    const isDifferentUser = this.currentUser && this.currentUser.id !== user.id;
     this.currentUser = user;
 
     try {
@@ -261,6 +265,11 @@ class NexconnManager {
 
       if (!this.initialized && tokenRes.appKey) {
         await this.initialize(tokenRes.appKey);
+      }
+
+      // If already connected to Nexconn with valid token, don't flap the socket
+      if (this.connected && this.token === tokenRes.token) {
+        return { connected: true, liveNetwork: true, user, token: this.token };
       }
 
       if (NCEngine && typeof NCEngine.connect === 'function' && tokenRes.token) {

@@ -134,22 +134,22 @@ async function main() {
     await sleep(1200);
     await takeScreenshot('04_split_view_copilot_open_1440x900.png');
 
-    // 5. Agent Dashboard (1536 x 864) - Copilot Closed
-    console.log('\n--- 5. Agent Dashboard at 1536 x 864 (Copilot Closed) ---');
+    // 5. Agent Dashboard (1536 x 864) - Copilot Open (Default in standalone)
+    console.log('\n--- 5. Agent Dashboard at 1536 x 864 (Copilot Open) ---');
     await page.setViewport({ width: 1536, height: 864, deviceScaleFactor: 1 });
     await page.goto(`${FRONTEND_URL}/agent`, { waitUntil: 'networkidle0' });
     await sleep(1200);
-    await takeScreenshot('05_agent_dashboard_copilot_closed_1536x864.png');
+    await takeScreenshot('05_agent_dashboard_copilot_open_1536x864.png');
 
-    // 6. Agent Dashboard (1536 x 864) - Copilot Open
-    console.log('\n--- 6. Agent Dashboard at 1536 x 864 (Copilot Open) ---');
+    // 6. Agent Dashboard (1536 x 864) - Copilot Closed (Toggled)
+    console.log('\n--- 6. Agent Dashboard at 1536 x 864 (Copilot Closed) ---');
     await page.evaluate(() => {
       const btns = Array.from(document.querySelectorAll('button'));
       const copilotBtn = btns.find(b => b.textContent.includes('Copilot'));
       if (copilotBtn) copilotBtn.click();
     });
     await sleep(1200);
-    await takeScreenshot('06_agent_dashboard_copilot_open_1536x864.png');
+    await takeScreenshot('06_agent_dashboard_copilot_closed_1536x864.png');
 
     // 7. Customer Portal Desktop (1536 x 864)
     console.log('\n--- 7. Customer Portal Desktop at 1536 x 864 ---');

@@ -167,6 +167,11 @@ async function runMilestone4FullE2E() {
     const pagePriya = await ctxPriya.newPage();
     const pageKabir = await ctxKabir.newPage();
 
+    // Reset tickets in backend to ensure clean test baseline
+    await axios.patch(`${BACKEND_URL}/api/tickets/tkt_1021`, { status: 'AI Handling', humanRequested: false }).catch(() => {});
+    await axios.patch(`${BACKEND_URL}/api/tickets/tkt_1022`, { status: 'AI Handling', humanRequested: false }).catch(() => {});
+    await axios.patch(`${BACKEND_URL}/api/tickets/tkt_1023`, { status: 'AI Handling', humanRequested: false }).catch(() => {});
+
     // Open sessions and clean local storage
     await pageAgent.goto(`${FRONTEND_URL}/agent`, { waitUntil: 'domcontentloaded' });
     await pageAarav.goto(`${FRONTEND_URL}/customer?id=cust_aarav`, { waitUntil: 'domcontentloaded' });

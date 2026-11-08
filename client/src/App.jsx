@@ -34,13 +34,26 @@ export default function App() {
   const [selectedTicketId, setSelectedTicketId] = useState(initialCust.ticket.id);
   const [isPoliciesOpen, setIsPoliciesOpen] = useState(false);
 
+  // Authoritative Customer Selection: Synchronizes both panes & all components
   const handleSelectCustomer = (customer) => {
+    if (!customer) return;
     setCurrentCustomer(customer);
-    setSelectedTicketId(customer.ticket.id);
+    const tId = customer.ticket?.id || customer.id;
+    setSelectedTicketId(tId);
+  };
+
+  // Authoritative Ticket Selection from Agent Inbox: Synchronizes both panes & all components
+  const handleSelectTicketId = (ticketId) => {
+    if (!ticketId) return;
+    setSelectedTicketId(ticketId);
+    const matched = DEMO_CUSTOMERS.find(c => c.ticket?.id === ticketId || c.id === ticketId);
+    if (matched) {
+      setCurrentCustomer(matched);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-[#090909] text-[#FFFFFF] flex flex-col font-sans">
+    <div className="h-screen bg-[#090909] text-[#FFFFFF] flex flex-col font-sans overflow-hidden">
       {/* Top Global Navigation Bar */}
       <Navbar
         currentCustomer={currentCustomer}
@@ -48,13 +61,13 @@ export default function App() {
         onOpenPolicies={() => setIsPoliciesOpen(true)}
       />
 
-      {/* Main Content Area */}
-      <main className="flex-1 overflow-hidden">
+      {/* Main Workspace Canvas with intentional breathing space below navbar */}
+      <main className="flex-1 p-3 md:p-4 overflow-hidden bg-[#090909] min-h-0">
         <Routes>
           <Route
             path="/"
             element={
-              <div className="h-[calc(100vh-52px)] p-2 md:p-4 flex justify-center overflow-hidden bg-[#090909]">
+              <div className="h-full max-w-2xl mx-auto flex flex-col justify-center overflow-hidden">
                 <CustomerPortal
                   customer={currentCustomer}
                   onSelectCustomer={handleSelectCustomer}
@@ -65,7 +78,7 @@ export default function App() {
           <Route
             path="/customer"
             element={
-              <div className="h-[calc(100vh-52px)] p-2 md:p-4 flex justify-center overflow-hidden bg-[#090909]">
+              <div className="h-full max-w-2xl mx-auto flex flex-col justify-center overflow-hidden">
                 <CustomerPortal
                   customer={currentCustomer}
                   onSelectCustomer={handleSelectCustomer}
@@ -76,17 +89,23 @@ export default function App() {
           <Route
             path="/agent"
             element={
-              <AgentDashboard
-                selectedTicketId={selectedTicketId}
-                onSelectTicketId={setSelectedTicketId}
-                onOpenPolicies={() => setIsPoliciesOpen(true)}
-              />
+              <div className="h-full w-full rounded-2xl bg-[#0E0E0E] border border-[#1E1E1E] overflow-hidden shadow-2xl flex flex-col">
+                <AgentDashboard
+                  selectedTicketId={selectedTicketId}
+                  onSelectTicketId={handleSelectTicketId}
+                  onOpenPolicies={() => setIsPoliciesOpen(true)}
+                />
+              </div>
             }
           />
           <Route
             path="/split"
             element={
               <SplitView
+                currentCustomer={currentCustomer}
+                onSelectCustomer={handleSelectCustomer}
+                selectedTicketId={selectedTicketId}
+                onSelectTicketId={handleSelectTicketId}
                 onOpenPolicies={() => setIsPoliciesOpen(true)}
               />
             }

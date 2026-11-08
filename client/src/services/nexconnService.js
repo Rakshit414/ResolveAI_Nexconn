@@ -1,4 +1,10 @@
-import { NCEngine, DirectChannel, SendTextMessageParams } from '@nexconn/chat';
+import { 
+  NCEngine, 
+  DirectChannel, 
+  SendTextMessageParams,
+  MessageHandler,
+  ConnectionStatusHandler
+} from '@nexconn/chat';
 import { getNexconnToken, getNexconnStatus } from './api.js';
 import { DEMO_CUSTOMERS } from '../data/demoData.js';
 
@@ -34,6 +40,47 @@ class NexconnManager {
     this.initializeSeedHistory();
   }
 
+  saveHistoryToStorage() {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const obj = {};
+        for (const [chId, msgs] of this.channelHistory.entries()) {
+          obj[chId] = msgs;
+        }
+        window.localStorage.setItem('resolve_ai_channel_history', JSON.stringify(obj));
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  loadHistoryFromStorage() {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const saved = window.localStorage.getItem('resolve_ai_channel_history');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          for (const chId in parsed) {
+            if (Array.isArray(parsed[chId]) && parsed[chId].length > 0) {
+              const currentList = this.channelHistory.get(chId) || [];
+              const merged = [...currentList];
+              for (const msg of parsed[chId]) {
+                const msgId = msg.id || msg.messageId;
+                if (!merged.some(m => m.id === msgId || m.messageId === msgId)) {
+                  merged.push(msg);
+                }
+                if (msgId) this.seenMessageIds.add(msgId);
+              }
+              this.channelHistory.set(chId, merged);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
   /**
    * Seed initial conversation history per channel
    */
@@ -59,6 +106,8 @@ class NexconnManager {
       this.seenMessageIds.add(initialMsgId);
       this.channelHistory.set(channelId, [seedMsg]);
     });
+
+    this.loadHistoryFromStorage();
   }
 
   /**
@@ -121,6 +170,10 @@ class NexconnManager {
    * Connect an authenticated user to Nexconn
    */
   async connectUser(user) {
+    if (this.currentUser && this.currentUser.id !== user.id) {
+      console.log(`[Nexconn] Switching user from ${this.currentUser.id} to ${user.id}`);
+      await this.disconnect();
+    }
     this.currentUser = user;
 
     try {
@@ -141,10 +194,25 @@ class NexconnManager {
 
       if (NCEngine && typeof NCEngine.connect === 'function' && tokenRes.token) {
         this.registerGlobalHandler();
-        await NCEngine.connect({ token: tokenRes.token });
+        try {
+          if (typeof NCEngine.addConnectionStatusHandler === 'function') {
+            const statusCallbacks = {
+              onConnectionStatusChanged: (status) => {
+                console.log('[Nexconn] Connection status changed:', status);
+              }
+            };
+            const statusHandler = ConnectionStatusHandler 
+              ? new ConnectionStatusHandler(statusCallbacks)
+              : { _invoker: statusCallbacks, ...statusCallbacks };
+            NCEngine.addConnectionStatusHandler('resolve-ai-conn-status', statusHandler);
+          }
+        } catch (statusErr) {
+          // ignore
+        }
+        const connResult = await NCEngine.connect({ token: tokenRes.token });
         this.connected = true;
         this.token = tokenRes.token;
-        console.log('[Nexconn] Connected user to network:', user.name);
+        console.log('[Nexconn] Connected user to network:', user.name, 'connResult:', connResult);
         return { connected: true, liveNetwork: true, user, token: tokenRes.token };
       }
     } catch (err) {
@@ -162,69 +230,95 @@ class NexconnManager {
     const handlerId = 'resolve-ai-message-listener';
     try {
       if (NCEngine && typeof NCEngine.addMessageHandler === 'function') {
-        NCEngine.addMessageHandler(handlerId, {
+        const callbacks = {
           onMessageReceived: (event) => {
-            const rawMsg = event?.message || event;
-            if (!rawMsg) return;
+            const messageList = Array.isArray(event?.messages)
+              ? event.messages
+              : Array.isArray(event)
+              ? event
+              : event?.message
+              ? [event.message]
+              : [event];
 
-            // Extract channel identifier
-            let targetChannel = rawMsg.channelId || 
-              (rawMsg.metadata?.channelId) || 
-              (rawMsg.orderId ? `channel_${rawMsg.orderId}` : null);
+            for (const rawMsg of messageList) {
+              if (!rawMsg) continue;
+              console.log('[Nexconn] onMessageReceived from SDK event:', rawMsg?.messageId || 'no-id', 'from:', rawMsg?.senderUserId || rawMsg?.senderId);
 
-            // If incoming message from remote SDK user, map to channel
-            if (!targetChannel) {
-              const sender = rawMsg.senderUserId || rawMsg.senderId;
-              const target = rawMsg.channelIdentifier?.channelId || rawMsg.targetUserId;
-              
-              if (sender && sender.startsWith('cust_')) {
-                targetChannel = this.getChannelId({ customerId: sender });
-              } else if (target && target.startsWith('cust_')) {
-                targetChannel = this.getChannelId({ customerId: target });
+              // Extract channel identifier
+              let targetChannel = rawMsg.channelId || 
+                (rawMsg.metadata?.channelId) || 
+                (rawMsg.orderId ? `channel_${rawMsg.orderId}` : null);
+
+              // If incoming message from remote SDK user, map to channel
+              if (!targetChannel) {
+                const sender = rawMsg.senderUserId || rawMsg.senderId;
+                const target = rawMsg.channelIdentifier?.channelId || rawMsg.targetUserId;
+                
+                if (sender && sender.startsWith('cust_')) {
+                  targetChannel = this.getChannelId({ customerId: sender });
+                } else if (target && target.startsWith('cust_')) {
+                  targetChannel = this.getChannelId({ customerId: target });
+                } else if (this.currentUser?.id && this.currentUser.id.startsWith('cust_')) {
+                  targetChannel = this.getChannelId({ customerId: this.currentUser.id });
+                }
               }
+
+              if (!targetChannel) continue;
+
+              // Extract message text whether from SDK Message or payload
+              let text = '';
+              if (rawMsg.content && typeof rawMsg.content === 'object') {
+                text = rawMsg.content.text || rawMsg.content.content || '';
+              } else if (typeof rawMsg.content === 'string') {
+                text = rawMsg.content;
+              } else {
+                text = rawMsg.text || '';
+              }
+
+              console.log('[Nexconn] INCOMING RAWMSG JSON:', JSON.stringify({
+                messageId: rawMsg.messageId,
+                sender: rawMsg.senderUserId,
+                targetChannel,
+                content: rawMsg.content,
+                text
+              }));
+
+              if (!text) continue;
+
+              const senderId = rawMsg.senderUserId || rawMsg.senderId || 'customer';
+              const isAgent = (senderId && senderId.includes('agent')) || rawMsg.senderRole === 'agent';
+              const customerMatch = DEMO_CUSTOMERS.find(c => c.id === senderId);
+              const senderName = isAgent 
+                ? 'Sarah Lin' 
+                : (customerMatch?.name || rawMsg.senderName || 'Customer');
+
+              const canonicalMsg = {
+                id: rawMsg.messageId || rawMsg.id || `msg_${Date.now()}`,
+                messageId: rawMsg.messageId || rawMsg.id || `msg_${Date.now()}`,
+                channelId: targetChannel,
+                senderId,
+                senderName,
+                senderRole: isAgent ? 'agent' : 'customer',
+                senderAvatar: customerMatch?.avatar || rawMsg.senderAvatar,
+                targetUserId: rawMsg.channelIdentifier?.channelId || rawMsg.targetUserId,
+                text,
+                timestamp: rawMsg.sentTime ? new Date(rawMsg.sentTime).toISOString() : (rawMsg.timestamp || new Date().toISOString()),
+                metadata: rawMsg.metadata || {},
+              };
+
+              this.dispatchToChannel(targetChannel, canonicalMsg);
             }
-
-            if (!targetChannel) return;
-
-            // Extract message text whether from SDK Message or payload
-            let text = '';
-            if (rawMsg.content && typeof rawMsg.content === 'object') {
-              text = rawMsg.content.content || rawMsg.content.text || '';
-            } else if (typeof rawMsg.content === 'string') {
-              text = rawMsg.content;
-            } else {
-              text = rawMsg.text || '';
-            }
-
-            if (!text) return;
-
-            const senderId = rawMsg.senderUserId || rawMsg.senderId || 'customer';
-            const isAgent = (senderId && senderId.includes('agent')) || rawMsg.senderRole === 'agent';
-            const customerMatch = DEMO_CUSTOMERS.find(c => c.id === senderId);
-            const senderName = isAgent 
-              ? 'Sarah Lin' 
-              : (customerMatch?.name || rawMsg.senderName || 'Customer');
-
-            const canonicalMsg = {
-              id: rawMsg.messageId || rawMsg.id || `msg_${Date.now()}`,
-              messageId: rawMsg.messageId || rawMsg.id || `msg_${Date.now()}`,
-              channelId: targetChannel,
-              senderId,
-              senderName,
-              senderRole: isAgent ? 'agent' : 'customer',
-              senderAvatar: customerMatch?.avatar || rawMsg.senderAvatar,
-              targetUserId: rawMsg.channelIdentifier?.channelId || rawMsg.targetUserId,
-              text,
-              timestamp: rawMsg.sentTime ? new Date(rawMsg.sentTime).toISOString() : (rawMsg.timestamp || new Date().toISOString()),
-              metadata: rawMsg.metadata || {},
-            };
-
-            this.dispatchToChannel(targetChannel, canonicalMsg);
           },
           onOfflineMessageSyncCompleted: () => {
             console.log('[Nexconn] Offline message sync complete');
           },
-        });
+        };
+
+        const msgHandler = MessageHandler 
+          ? new MessageHandler(callbacks)
+          : { _invoker: callbacks, ...callbacks };
+
+        NCEngine.addMessageHandler(handlerId, msgHandler);
       }
     } catch (err) {
       console.warn('[Nexconn] addMessageHandler warning:', err.message);
@@ -265,6 +359,7 @@ class NexconnManager {
     }
     const currentList = this.channelHistory.get(channelId);
     currentList.push(message);
+    this.saveHistoryToStorage();
 
     // Call ONLY callbacks subscribed to this exact channelId
     const callbacks = this.channelSubscribers.get(channelId);
@@ -364,9 +459,13 @@ class NexconnManager {
 
           if (channel && typeof channel.sendMessage === 'function') {
             const params = SendTextMessageParams
-              ? new SendTextMessageParams({ content: trimmedText })
-              : { content: { content: trimmedText } };
-            await channel.sendMessage(params);
+              ? new SendTextMessageParams({ text: trimmedText })
+              : { content: { text: trimmedText } };
+            const sdkResult = await channel.sendMessage(params);
+            console.log('[Nexconn] SDK sendMessage to', targetUserId, 'result:', sdkResult);
+            if (sdkResult?.data?.messageId) {
+              this.seenMessageIds.add(sdkResult.data.messageId);
+            }
           }
         }
       } catch (sdkErr) {
@@ -397,6 +496,8 @@ class NexconnManager {
       // ignore
     }
     this.connected = false;
+    this.token = null;
+    this.directChannels.clear();
     this.currentUser = null;
   }
 }

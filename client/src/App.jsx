@@ -8,8 +8,30 @@ import PolicyDrawer from './components/PolicyDrawer';
 import { DEMO_CUSTOMERS } from './data/demoData';
 
 export default function App() {
-  const [currentCustomer, setCurrentCustomer] = useState(DEMO_CUSTOMERS[0]);
-  const [selectedTicketId, setSelectedTicketId] = useState(DEMO_CUSTOMERS[0].ticket.id);
+  const getInitialCustomer = () => {
+    try {
+      if (typeof window !== 'undefined' && window.location.search) {
+        const params = new URLSearchParams(window.location.search);
+        const custId = params.get('customer') || params.get('id');
+        const orderId = params.get('order');
+        if (custId) {
+          const found = DEMO_CUSTOMERS.find(c => c.id === custId);
+          if (found) return found;
+        }
+        if (orderId) {
+          const found = DEMO_CUSTOMERS.find(c => c.order.orderId === orderId);
+          if (found) return found;
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+    return DEMO_CUSTOMERS[0];
+  };
+
+  const initialCust = getInitialCustomer();
+  const [currentCustomer, setCurrentCustomer] = useState(initialCust);
+  const [selectedTicketId, setSelectedTicketId] = useState(initialCust.ticket.id);
   const [isPoliciesOpen, setIsPoliciesOpen] = useState(false);
 
   const handleSelectCustomer = (customer) => {

@@ -50,10 +50,6 @@ router.post('/token', async (req, res) => {
       name: name || userId,
     };
 
-    if (avatar && typeof avatar === 'string' && avatar.startsWith('http')) {
-      payload.portraitUri = avatar;
-    }
-
     const response = await axios.post(
       `${nexconnBaseUrl}/v4/auth/access-token/issue`,
       payload,

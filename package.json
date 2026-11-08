@@ -1,0 +1,27 @@
+{
+  "name": "resolve-ai",
+  "version": "1.0.0",
+  "description": "AI-powered customer support and real-time communication platform built with Nexconn Chat SDK and Gemini AI",
+  "private": true,
+  "scripts": {
+    "dev:server": "cd server && npm run dev",
+    "dev:client": "cd client && npm run dev",
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "build:client": "cd client && npm run build",
+    "build": "cd client && npm run build",
+    "start": "cd server && npm start"
+  },
+  "keywords": [
+    "nexconn",
+    "chat-sdk",
+    "ai-copilot",
+    "gemini",
+    "customer-support",
+    "resolve-ai"
+  ],
+  "author": "Resolve AI Team",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^10.0.7"
+  }
+}

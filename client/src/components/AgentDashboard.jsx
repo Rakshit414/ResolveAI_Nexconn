@@ -77,7 +77,7 @@ export default function AgentDashboard({
             prev.map((t) => {
               const remote = res.tickets.find((rt) => rt.id === t.id);
               if (remote) {
-                nexconnService.setTicketStatus(t.id, remote.status);
+                nexconnService.setTicketStatus(t.id, remote.status, { lastUpdated: remote.lastUpdated });
                 return {
                   ...t,
                   status: remote.status,

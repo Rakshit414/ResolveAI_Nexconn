@@ -74,9 +74,9 @@ export const DEMO_CUSTOMERS = [
       category: "Delivery Delay",
       priority: "High",
       sentiment: "Frustrated",
-      status: "Human Requested",
+      status: "AI Handling",
       lastUpdated: new Date(Date.now() - 1000 * 60 * 12).toISOString(),
-      humanRequested: true,
+      humanRequested: false,
       summary: "Customer ordered NovaSprint Pro Running Shoes (NC1021) on Nov 2. Package is delayed at the regional logistics hub. Customer is frustrated about missing the Nov 5 delivery target.",
       suggestedReply: "Hello Aarav, I sincerely apologize for the delay with your NovaSprint Pro shoes (Order #NC1021). I just checked our courier dispatch system: your package is currently at the regional distribution center undergoing a transit scan. Standard delivery takes 4–6 business days, and while your order was delayed by unexpected hub congestion, I have flagged it for priority movement. I will monitor this shipment and update you within 24 hours.",
       pendingAction: "Agent needs to coordinate with courier hub and confirm priority tracking dispatch."
@@ -146,9 +146,9 @@ export const DEMO_CUSTOMERS = [
       category: "Wrong Product",
       priority: "Critical",
       sentiment: "Negative",
-      status: "Human Requested",
+      status: "AI Handling",
       lastUpdated: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
-      humanRequested: true,
+      humanRequested: false,
       summary: "Wrong item delivered for order NC1023. Customer ordered NovaBass ANC Wireless Headphones ($89.00) but received wired earphones. Highly dissatisfied, demanding instant resolution.",
       suggestedReply: "Hi Kabir, I am so sorry for this mix-up with order #NC1023. You should have received the NovaBass Wireless ANC Headphones, and receiving the wrong item is unacceptable. Under our incorrect product policy, we will expedite the correct wireless headphones to you at zero additional cost. To trigger the immediate replacement order and complimentary return label, could you please share a quick photo of the item and box barcode you received?",
       pendingAction: "Customer needs to supply photo verification of wrong item to expedite replacement."

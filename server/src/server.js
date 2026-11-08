@@ -68,7 +68,10 @@ app.use((req, res) => {
 
 // Global error handler
 app.use((err, req, res, next) => {
-  console.error('Unhandled server error:', err);
+  if (err.type === 'entity.too.large' || err.status === 413) {
+    return res.status(413).json({ success: false, error: 'Payload too large', message: 'Request entity exceeds payload size limit' });
+  }
+  console.error('Unhandled server error:', err.message);
   res.status(500).json({ success: false, error: 'Internal Server Error', message: err.message });
 });
 

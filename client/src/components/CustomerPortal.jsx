@@ -56,7 +56,7 @@ export default function CustomerPortal({ customer, onSelectCustomer, onMessageSe
             const beStatus = res.ticket.status;
             setTicketStatus(beStatus);
             setHumanRequested(beStatus === 'Human Requested' || beStatus === 'Human Agent Active');
-            nexconnService.setTicketStatus(ticketId, beStatus);
+            nexconnService.setTicketStatus(ticketId, beStatus, { lastUpdated: res.ticket.lastUpdated });
           }
         })
         .catch(() => {});

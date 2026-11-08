@@ -4,6 +4,19 @@ import { BUSINESS_INFO } from '../data/demoData.js';
 
 const router = express.Router();
 
+// Input sanitizer to prevent DoS via unbounded payloads or oversized messages
+function sanitizeMessages(messages) {
+  if (!messages || !Array.isArray(messages)) return null;
+  const slice = messages.slice(-50);
+  return slice.map(m => {
+    const rawText = String(m?.text || m?.content || '');
+    return {
+      sender: String(m?.sender || m?.senderName || 'User').substring(0, 50),
+      text: rawText.substring(0, 2000).trim(),
+    };
+  });
+}
+
 // Robust helper to call Gemini with automatic model failover (e.g. if 503 high demand spike)
 async function callGemini(prompt) {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -38,13 +51,14 @@ async function callGemini(prompt) {
  */
 router.post('/analyze', async (req, res) => {
   const { messages, customer, order } = req.body;
+  const cleanList = sanitizeMessages(messages);
 
-  if (!messages || !Array.isArray(messages)) {
+  if (!cleanList) {
     return res.status(400).json({ success: false, error: 'messages array is required' });
   }
 
-  const conversationText = messages
-    .map(m => `${m.sender || m.senderName || 'User'}: ${m.text || m.content}`)
+  const conversationText = cleanList
+    .map(m => `${m.sender}: ${m.text}`)
     .join('\n');
 
   const orderContext = order ? JSON.stringify(order, null, 2) : 'No order info provided';
@@ -148,13 +162,14 @@ Return ONLY a valid JSON object matching this schema without markdown fences:
  */
 router.post('/summarize', async (req, res) => {
   const { messages, customer, order } = req.body;
+  const cleanList = sanitizeMessages(messages);
 
-  if (!messages || !Array.isArray(messages)) {
+  if (!cleanList) {
     return res.status(400).json({ success: false, error: 'messages array is required' });
   }
 
-  const conversationText = messages
-    .map(m => `${m.sender || m.senderName || 'User'}: ${m.text || m.content}`)
+  const conversationText = cleanList
+    .map(m => `${m.sender}: ${m.text}`)
     .join('\n');
 
   const orderContext = order ? JSON.stringify(order, null, 2) : 'No order info';
@@ -200,13 +215,14 @@ Generate a concise summary of the conversation in valid JSON without markdown fe
  */
 router.post('/suggest-reply', async (req, res) => {
   const { messages, customer, order } = req.body;
+  const cleanList = sanitizeMessages(messages);
 
-  if (!messages || !Array.isArray(messages)) {
+  if (!cleanList) {
     return res.status(400).json({ success: false, error: 'messages array is required' });
   }
 
-  const conversationText = messages
-    .map(m => `${m.sender || m.senderName || 'User'}: ${m.text || m.content}`)
+  const conversationText = cleanList
+    .map(m => `${m.sender}: ${m.text}`)
     .join('\n');
 
   const policiesText = BUSINESS_INFO.policies

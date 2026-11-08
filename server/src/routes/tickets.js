@@ -24,14 +24,36 @@ function getInitialTickets() {
   }));
 }
 
-function saveTickets(ticketsList) {
+// Mutex promise queue to serialize disk persistence and prevent race conditions or corrupt partial writes
+let writeQueue = Promise.resolve();
+
+function saveTicketsAtomic(ticketsList) {
+  writeQueue = writeQueue.then(async () => {
+    try {
+      if (!fs.existsSync(DATA_DIR)) {
+        fs.mkdirSync(DATA_DIR, { recursive: true });
+      }
+      const tempFile = path.resolve(DATA_DIR, `tickets.tmp.${Date.now()}.${Math.random().toString(36).substring(2, 7)}`);
+      const payload = JSON.stringify(ticketsList, null, 2);
+      await fs.promises.writeFile(tempFile, payload, 'utf8');
+      await fs.promises.rename(tempFile, TICKETS_FILE);
+    } catch (err) {
+      console.warn('[Tickets] Atomic persistence error:', err.message);
+    }
+  });
+  return writeQueue;
+}
+
+function saveTicketsSync(ticketsList) {
   try {
     if (!fs.existsSync(DATA_DIR)) {
       fs.mkdirSync(DATA_DIR, { recursive: true });
     }
-    fs.writeFileSync(TICKETS_FILE, JSON.stringify(ticketsList, null, 2), 'utf8');
+    const tempFile = path.resolve(DATA_DIR, `tickets.tmp.${Date.now()}`);
+    fs.writeFileSync(tempFile, JSON.stringify(ticketsList, null, 2), 'utf8');
+    fs.renameSync(tempFile, TICKETS_FILE);
   } catch (err) {
-    console.warn('[Tickets] Failed to persist tickets to disk:', err.message);
+    console.warn('[Tickets] Sync persistence error:', err.message);
   }
 }
 
@@ -48,17 +70,25 @@ function loadTickets() {
     console.warn('[Tickets] Failed to load tickets from disk, seeding defaults:', err.message);
   }
   const defaults = getInitialTickets();
-  saveTickets(defaults);
+  saveTicketsSync(defaults);
   return defaults;
 }
 
 // In-memory tickets store backed by local disk persistence
 let tickets = loadTickets();
 
-// GET /api/tickets - List all tickets with optional filtering
+const VALID_STATUSES = ['AI Handling', 'Human Requested', 'Human Agent Active', 'Resolved'];
+const VALID_PRIORITIES = ['Critical', 'High', 'Medium', 'Low'];
+const VALID_CATEGORIES = ['Delivery Delay', 'Refund Request', 'Wrong Product', 'Cancellation', 'General Inquiry', 'Damaged Product', 'Payment Issue', 'Other'];
+
+// GET /api/tickets - List all tickets with optional filtering and customer scoping
 router.get('/', (req, res) => {
-  const { priority, status, category } = req.query;
+  const { priority, status, category, customerId } = req.query;
   let filtered = [...tickets];
+
+  if (customerId) {
+    filtered = filtered.filter(t => t.customerId === customerId || t.customer?.id === customerId);
+  }
 
   if (priority && priority !== 'All') {
     filtered = filtered.filter(t => t.priority.toLowerCase() === priority.toLowerCase());
@@ -83,17 +113,23 @@ router.get('/', (req, res) => {
   });
 });
 
-// GET /api/tickets/:id - Get specific ticket
+// GET /api/tickets/:id - Get specific ticket with optional customer ownership verification
 router.get('/:id', (req, res) => {
   const ticket = tickets.find(t => t.id === req.params.id || t.orderId === req.params.id);
   if (!ticket) {
     return res.status(404).json({ success: false, error: 'Ticket not found' });
   }
+
+  const { customerId } = req.query;
+  if (customerId && ticket.customerId !== customerId && ticket.customer?.id !== customerId) {
+    return res.status(403).json({ success: false, error: 'Access denied: ticket does not belong to specified customer' });
+  }
+
   res.json({ success: true, ticket });
 });
 
-// PATCH /api/tickets/:id - Update ticket status, priority, or category
-router.patch('/:id', (req, res) => {
+// PATCH /api/tickets/:id - Update ticket status, priority, or category with strict validation
+router.patch('/:id', async (req, res) => {
   const index = tickets.findIndex(t => t.id === req.params.id || t.orderId === req.params.id);
   if (index === -1) {
     return res.status(404).json({ success: false, error: 'Ticket not found' });
@@ -101,7 +137,31 @@ router.patch('/:id', (req, res) => {
 
   const { status, priority, category, summary, suggestedReply, pendingAction } = req.body;
 
-  if (status !== undefined) tickets[index].status = status;
+  if (status !== undefined && !VALID_STATUSES.includes(status)) {
+    return res.status(400).json({ 
+      success: false, 
+      error: `Invalid status "${status}". Allowed values: ${VALID_STATUSES.join(', ')}` 
+    });
+  }
+
+  if (priority !== undefined && !VALID_PRIORITIES.includes(priority)) {
+    return res.status(400).json({ 
+      success: false, 
+      error: `Invalid priority "${priority}". Allowed values: ${VALID_PRIORITIES.join(', ')}` 
+    });
+  }
+
+  if (category !== undefined && !VALID_CATEGORIES.includes(category)) {
+    return res.status(400).json({ 
+      success: false, 
+      error: `Invalid category "${category}". Allowed values: ${VALID_CATEGORIES.join(', ')}` 
+    });
+  }
+
+  if (status !== undefined) {
+    tickets[index].status = status;
+    tickets[index].humanRequested = status === 'Human Requested' ? true : status === 'Resolved' ? false : tickets[index].humanRequested;
+  }
   if (priority !== undefined) tickets[index].priority = priority;
   if (category !== undefined) tickets[index].category = category;
   if (summary !== undefined) tickets[index].summary = summary;
@@ -109,13 +169,13 @@ router.patch('/:id', (req, res) => {
   if (pendingAction !== undefined) tickets[index].pendingAction = pendingAction;
   
   tickets[index].lastUpdated = new Date().toISOString();
-  saveTickets(tickets);
+  await saveTicketsAtomic(tickets);
 
   res.json({ success: true, ticket: tickets[index] });
 });
 
 // POST /api/tickets/:id/human-handoff - Customer requests human assistance
-router.post('/:id/human-handoff', (req, res) => {
+router.post('/:id/human-handoff', async (req, res) => {
   const index = tickets.findIndex(t => t.id === req.params.id || t.orderId === req.params.id);
   if (index === -1) {
     return res.status(404).json({ success: false, error: 'Ticket not found' });
@@ -124,7 +184,7 @@ router.post('/:id/human-handoff', (req, res) => {
   tickets[index].humanRequested = true;
   tickets[index].status = 'Human Requested';
   tickets[index].lastUpdated = new Date().toISOString();
-  saveTickets(tickets);
+  await saveTicketsAtomic(tickets);
 
   res.json({
     success: true,
@@ -134,7 +194,7 @@ router.post('/:id/human-handoff', (req, res) => {
 });
 
 // POST /api/tickets/:id/take-over - Agent takes over ticket
-router.post('/:id/take-over', (req, res) => {
+router.post('/:id/take-over', async (req, res) => {
   const index = tickets.findIndex(t => t.id === req.params.id || t.orderId === req.params.id);
   if (index === -1) {
     return res.status(404).json({ success: false, error: 'Ticket not found' });
@@ -143,7 +203,7 @@ router.post('/:id/take-over', (req, res) => {
   tickets[index].humanRequested = false;
   tickets[index].status = 'Human Agent Active';
   tickets[index].lastUpdated = new Date().toISOString();
-  saveTickets(tickets);
+  await saveTicketsAtomic(tickets);
 
   res.json({
     success: true,
@@ -153,7 +213,7 @@ router.post('/:id/take-over', (req, res) => {
 });
 
 // POST /api/tickets/:id/resolve - Agent marks ticket as resolved
-router.post('/:id/resolve', (req, res) => {
+router.post('/:id/resolve', async (req, res) => {
   const index = tickets.findIndex(t => t.id === req.params.id || t.orderId === req.params.id);
   if (index === -1) {
     return res.status(404).json({ success: false, error: 'Ticket not found' });
@@ -162,7 +222,7 @@ router.post('/:id/resolve', (req, res) => {
   tickets[index].humanRequested = false;
   tickets[index].status = 'Resolved';
   tickets[index].lastUpdated = new Date().toISOString();
-  saveTickets(tickets);
+  await saveTicketsAtomic(tickets);
 
   res.json({
     success: true,
@@ -171,10 +231,20 @@ router.post('/:id/resolve', (req, res) => {
   });
 });
 
-// POST /api/tickets/reset - Reset tickets to initial seed state
-router.post('/reset', (req, res) => {
+// POST /api/tickets/reset - Reset tickets to initial seed state (Protected Demo/Dev endpoint)
+router.post('/reset', async (req, res) => {
+  // Security protection: Prevent unauthorized resets in strict production mode unless demo override is configured
+  if (process.env.NODE_ENV === 'production' && !process.env.ALLOW_DEMO_RESET) {
+    return res.status(403).json({
+      success: false,
+      error: 'Ticket reset is disabled in production environment.'
+    });
+  }
+
   tickets = getInitialTickets();
-  saveTickets(tickets);
+  await saveTicketsAtomic(tickets);
+  console.log('[Tickets] Seed reset executed by client/test harness.');
+
   res.json({
     success: true,
     message: 'Tickets reset to demo defaults successfully',

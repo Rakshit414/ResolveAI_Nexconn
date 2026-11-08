@@ -105,7 +105,11 @@ class NexconnManager {
         if (saved) {
           const parsed = JSON.parse(saved);
           for (const tId in parsed) {
-            this.ticketStatuses.set(tId, parsed[tId]);
+            const current = this.ticketStatuses.get(tId);
+            const savedItem = parsed[tId];
+            if (!current || !current.lastUpdated || (savedItem.lastUpdated && new Date(savedItem.lastUpdated).getTime() >= new Date(current.lastUpdated).getTime())) {
+              this.ticketStatuses.set(tId, savedItem);
+            }
           }
         }
       }
@@ -122,12 +126,19 @@ class NexconnManager {
   setTicketStatus(ticketId, status, extra = {}) {
     if (!ticketId || !status) return;
     const current = this.ticketStatuses.get(ticketId) || {};
+    const newTimestamp = extra.lastUpdated || new Date().toISOString();
+
+    // Prevent older status from overwriting newer status
+    if (current.lastUpdated && extra.lastUpdated && new Date(current.lastUpdated).getTime() > new Date(extra.lastUpdated).getTime()) {
+      return current;
+    }
+
     const updated = {
       ...current,
       ...extra,
       status,
       humanRequested: status === 'Human Requested' ? true : status === 'Resolved' ? false : current.humanRequested,
-      lastUpdated: new Date().toISOString(),
+      lastUpdated: newTimestamp,
     };
     this.ticketStatuses.set(ticketId, updated);
     this.saveTicketStatuses();

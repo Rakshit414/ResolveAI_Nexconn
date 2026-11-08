@@ -84,11 +84,14 @@ router.post('/token', async (req, res) => {
     });
   } catch (err) {
     console.error('Nexconn Token Issue Error:', err.response?.data || err.message);
+    const sanitizedError = process.env.NODE_ENV === 'production' 
+      ? 'Nexconn gateway unavailable' 
+      : (err.response?.data?.message || err.message);
     return res.status(502).json({
       success: false,
       configured: true,
       error: 'Failed to issue token from Nexconn API',
-      details: err.response?.data || err.message,
+      details: sanitizedError,
     });
   }
 });

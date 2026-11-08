@@ -20,6 +20,8 @@ export default function AgentDashboard({
   // Closed by default, opens as a floating overlay drawer over the conversation workspace
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
   const [isInboxCollapsed, setIsInboxCollapsed] = useState(false);
+  // In Split View, inbox is closed by default to give conversation full width; can be toggled as an overlay drawer
+  const [isInboxDrawerOpen, setIsInboxDrawerOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState('chat'); // 'inbox' | 'chat' | 'copilot'
   const [stats, setStats] = useState({
     total: 3,
@@ -391,48 +393,89 @@ export default function AgentDashboard({
         </button>
       </div>
 
-      {/* Main SaaS Workspace Body: Exactly TWO permanent columns with Overlay Copilot */}
+      {/* Main SaaS Workspace Body */}
       <div className="flex-1 flex overflow-hidden min-h-0 relative">
-        {/* Column 1 (Left): Compact / Collapsible Conversation Inbox */}
-        <div className={`shrink-0 h-full ${
-          mobileTab === 'inbox' ? 'block w-full' : 'hidden md:block'
-        }`}>
-          <ConversationInbox
-            tickets={filteredTickets}
-            selectedTicket={selectedTicket}
-            onSelectTicket={(t) => {
-              const currentStatus = nexconnService.getTicketStatus(t.id)?.status || t.status;
-              const updatedTicket = {
-                ...t,
-                status: currentStatus,
-                humanRequested: currentStatus === 'Human Requested',
-              };
-              setSelectedTicket(updatedTicket);
-              if (onSelectTicketId) onSelectTicketId(t.id);
-              const channelId = t.channelId || `channel_${t.orderId}`;
-              setMessagesMap((prev) => ({
-                ...prev,
-                [t.id]: nexconnService.getChannelMessages(channelId),
-              }));
-              getTicket(t.id).then((res) => {
-                if (res?.ticket) {
-                  setSelectedTicket(res.ticket);
-                  setTickets((prev) => prev.map((item) => item.id === t.id ? { ...item, ...res.ticket } : item));
-                }
-              }).catch(() => {});
-              setMobileTab('chat');
-            }}
-            activeFilter={activeFilter}
-            onSelectFilter={setActiveFilter}
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            isCollapsed={isInboxCollapsed}
-            onToggleCollapse={() => setIsInboxCollapsed(!isInboxCollapsed)}
-            isSplitView={isSplitView}
-          />
-        </div>
+        {/* Column 1 (Left): In Standalone /agent mode, Permanent Inbox Rail (~260px) */}
+        {!isSplitView && (
+          <div className={`shrink-0 h-full ${
+            mobileTab === 'inbox' ? 'block w-full' : 'hidden md:block'
+          }`}>
+            <ConversationInbox
+              tickets={filteredTickets}
+              selectedTicket={selectedTicket}
+              onSelectTicket={(t) => {
+                const currentStatus = nexconnService.getTicketStatus(t.id)?.status || t.status;
+                const updatedTicket = {
+                  ...t,
+                  status: currentStatus,
+                  humanRequested: currentStatus === 'Human Requested',
+                };
+                setSelectedTicket(updatedTicket);
+                if (onSelectTicketId) onSelectTicketId(t.id);
+                const channelId = t.channelId || `channel_${t.orderId}`;
+                setMessagesMap((prev) => ({
+                  ...prev,
+                  [t.id]: nexconnService.getChannelMessages(channelId),
+                }));
+                getTicket(t.id).then((res) => {
+                  if (res?.ticket) {
+                    setSelectedTicket(res.ticket);
+                    setTickets((prev) => prev.map((item) => item.id === t.id ? { ...item, ...res.ticket } : item));
+                  }
+                }).catch(() => {});
+                setMobileTab('chat');
+              }}
+              activeFilter={activeFilter}
+              onSelectFilter={setActiveFilter}
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              isCollapsed={isInboxCollapsed}
+              onToggleCollapse={() => setIsInboxCollapsed(!isInboxCollapsed)}
+              isSplitView={false}
+            />
+          </div>
+        )}
 
-        {/* Column 2 (Right): Large Full-Width Conversation Workspace (Never Compressed by Copilot!) */}
+        {/* In Split View Mode: Compact Slide-Out Inbox Drawer on Left */}
+        {isSplitView && isInboxDrawerOpen && (
+          <div className="absolute left-0 top-0 bottom-0 z-30 w-[270px] max-w-[85%] h-full shadow-2xl animate-in slide-in-from-left duration-200">
+            <ConversationInbox
+              tickets={filteredTickets}
+              selectedTicket={selectedTicket}
+              onSelectTicket={(t) => {
+                const currentStatus = nexconnService.getTicketStatus(t.id)?.status || t.status;
+                const updatedTicket = {
+                  ...t,
+                  status: currentStatus,
+                  humanRequested: currentStatus === 'Human Requested',
+                };
+                setSelectedTicket(updatedTicket);
+                if (onSelectTicketId) onSelectTicketId(t.id);
+                const channelId = t.channelId || `channel_${t.orderId}`;
+                setMessagesMap((prev) => ({
+                  ...prev,
+                  [t.id]: nexconnService.getChannelMessages(channelId),
+                }));
+                getTicket(t.id).then((res) => {
+                  if (res?.ticket) {
+                    setSelectedTicket(res.ticket);
+                    setTickets((prev) => prev.map((item) => item.id === t.id ? { ...item, ...res.ticket } : item));
+                  }
+                }).catch(() => {});
+                setIsInboxDrawerOpen(false);
+              }}
+              activeFilter={activeFilter}
+              onSelectFilter={setActiveFilter}
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              isCollapsed={false}
+              isSplitView={true}
+              onClose={() => setIsInboxDrawerOpen(false)}
+            />
+          </div>
+        )}
+
+        {/* Column 2 (Right): Large Full-Width Conversation Workspace (Never Compressed by Copilot or Inbox!) */}
         <div className={`flex-1 h-full min-w-0 flex flex-col ${
           mobileTab === 'chat' ? 'block' : 'hidden md:flex'
         }`}>
@@ -444,6 +487,10 @@ export default function AgentDashboard({
               onUpdateStatus={handleUpdateStatus}
               isCopilotOpen={isCopilotOpen}
               onToggleCopilot={() => setIsCopilotOpen(!isCopilotOpen)}
+              isSplitView={isSplitView}
+              isInboxOpen={isInboxDrawerOpen}
+              onToggleInbox={() => setIsInboxDrawerOpen(!isInboxDrawerOpen)}
+              inboxCount={filteredTickets.length}
             />
           ) : (
             <div className="flex-1 flex items-center justify-center p-6 text-[#8A8A8A] text-sm">
@@ -452,9 +499,9 @@ export default function AgentDashboard({
           )}
         </div>
 
-        {/* Real Overlay Drawer: Floats over the conversation workspace without resizing it! */}
+        {/* Real Overlay Drawer: Floats over the conversation workspace on the right without resizing it! */}
         {(isCopilotOpen || mobileTab === 'copilot') && selectedTicket && (
-          <div className={`absolute right-0 top-0 bottom-0 z-30 w-[380px] max-w-[90vw] h-full shadow-2xl animate-in slide-in-from-right duration-200 ${
+          <div className={`absolute right-0 top-0 bottom-0 z-30 w-[360px] md:w-[380px] max-w-[85%] h-full shadow-2xl animate-in slide-in-from-right duration-200 ${
             mobileTab === 'copilot' ? 'block w-full max-w-full' : 'hidden md:block'
           }`}>
             <AICopilotPanel

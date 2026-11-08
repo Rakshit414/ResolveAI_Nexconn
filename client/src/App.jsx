@@ -67,7 +67,7 @@ export default function App() {
           <Route
             path="/"
             element={
-              <div className="h-full max-w-5xl w-full mx-auto flex flex-col rounded-2xl bg-[#0C0C0C] border border-[#1E1E1E] shadow-2xl overflow-hidden">
+              <div className="h-full max-w-[1150px] w-full mx-auto flex flex-col rounded-2xl bg-[#0C0C0C] border border-[#1E1E1E] shadow-2xl overflow-hidden">
                 <CustomerPortal
                   customer={currentCustomer}
                   onSelectCustomer={handleSelectCustomer}
@@ -79,7 +79,7 @@ export default function App() {
           <Route
             path="/customer"
             element={
-              <div className="h-full max-w-5xl w-full mx-auto flex flex-col rounded-2xl bg-[#0C0C0C] border border-[#1E1E1E] shadow-2xl overflow-hidden">
+              <div className="h-full max-w-[1150px] w-full mx-auto flex flex-col rounded-2xl bg-[#0C0C0C] border border-[#1E1E1E] shadow-2xl overflow-hidden">
                 <CustomerPortal
                   customer={currentCustomer}
                   onSelectCustomer={handleSelectCustomer}

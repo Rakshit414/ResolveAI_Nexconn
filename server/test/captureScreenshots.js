@@ -100,103 +100,113 @@ async function main() {
       console.log(`✓ Saved: ${name}`);
     }
 
-    // 1. Split View (1536 x 864) - Copilot Closed
-    console.log('\n--- 1. Split View at 1536 x 864 (Copilot Closed) ---');
-    await page.setViewport({ width: 1536, height: 864, deviceScaleFactor: 1 });
-    await page.goto(`${FRONTEND_URL}/split`, { waitUntil: 'networkidle0' });
-    await sleep(1500);
-    await takeScreenshot('01_split_view_copilot_closed_1536x864.png');
+    const resolutions = [
+      { name: '1536x864', width: 1536, height: 864 },
+      { name: '1440x900', width: 1440, height: 900 },
+      { name: '1280x800', width: 1280, height: 800 },
+    ];
 
-    // 2. Split View (1536 x 864) - Copilot Open
-    console.log('\n--- 2. Split View at 1536 x 864 (Copilot Open) ---');
-    await page.evaluate(() => {
-      const btn = document.querySelector('#btn-toggle-copilot');
-      if (btn) btn.click();
-    });
-    await sleep(1200);
-    await takeScreenshot('02_split_view_copilot_open_1536x864.png');
+    for (const res of resolutions) {
+      console.log(`\n==================================================`);
+      console.log(`Capturing Resolution: ${res.name} (${res.width}x${res.height})`);
+      console.log(`==================================================`);
+      await page.setViewport({ width: res.width, height: res.height, deviceScaleFactor: 1 });
 
-    // 3. Split View (1440 x 900) - Copilot Closed
-    console.log('\n--- 3. Split View at 1440 x 900 (Copilot Closed) ---');
-    await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 1 });
-    await page.goto(`${FRONTEND_URL}/split`, { waitUntil: 'networkidle0' });
-    await sleep(1200);
-    await takeScreenshot('03_split_view_copilot_closed_1440x900.png');
+      // 1. Split View - Copilot Closed (Default)
+      console.log(`[${res.name}] 1. Split View - Copilot Closed`);
+      await page.goto(`${FRONTEND_URL}/split`, { waitUntil: 'networkidle0' });
+      await sleep(1500);
+      await takeScreenshot(`split_view_copilot_closed_${res.name}.png`);
 
-    // 4. Split View (1440 x 900) - Copilot Open
-    console.log('\n--- 4. Split View at 1440 x 900 (Copilot Open) ---');
-    await page.evaluate(() => {
-      const btn = document.querySelector('#btn-toggle-copilot');
-      if (btn) btn.click();
-    });
-    await sleep(1200);
-    await takeScreenshot('04_split_view_copilot_open_1440x900.png');
+      // 2. Split View - Copilot Open
+      console.log(`[${res.name}] 2. Split View - Copilot Open`);
+      await page.evaluate(() => {
+        const btn = document.querySelector('#btn-toggle-copilot');
+        if (btn) btn.click();
+      });
+      await sleep(1200);
+      await takeScreenshot(`split_view_copilot_open_${res.name}.png`);
 
-    // 5. Agent Dashboard (1536 x 864) - Copilot Closed
-    console.log('\n--- 5. Agent Dashboard at 1536 x 864 (Copilot Closed) ---');
-    await page.setViewport({ width: 1536, height: 864, deviceScaleFactor: 1 });
-    await page.goto(`${FRONTEND_URL}/agent`, { waitUntil: 'networkidle0' });
-    await sleep(1200);
-    await takeScreenshot('06_agent_dashboard_copilot_closed_1536x864.png');
+      // Close Copilot drawer
+      await page.evaluate(() => {
+        const btn = document.querySelector('#btn-close-copilot') || document.querySelector('#btn-toggle-copilot');
+        if (btn) btn.click();
+      });
+      await sleep(600);
 
-    // 6. Agent Dashboard (1536 x 864) - Copilot Open
-    console.log('\n--- 6. Agent Dashboard at 1536 x 864 (Copilot Open) ---');
-    await page.evaluate(() => {
-      const btn = document.querySelector('#btn-toggle-copilot');
-      if (btn) btn.click();
-    });
-    await sleep(1200);
-    await takeScreenshot('05_agent_dashboard_copilot_open_1536x864.png');
+      // 3. Split View - Inbox Drawer Open
+      console.log(`[${res.name}] 3. Split View - Inbox Drawer Open`);
+      await page.evaluate(() => {
+        const btn = document.querySelector('#btn-toggle-inbox');
+        if (btn) btn.click();
+      });
+      await sleep(1200);
+      await takeScreenshot(`split_view_inbox_open_${res.name}.png`);
 
-    // 7. Customer Portal Desktop (1536 x 864)
-    console.log('\n--- 7. Customer Portal Desktop at 1536 x 864 ---');
-    await page.goto(`${FRONTEND_URL}/customer`, { waitUntil: 'networkidle0' });
-    await sleep(1200);
-    await takeScreenshot('07_customer_portal_desktop_1536x864.png');
+      // Close Inbox drawer
+      await page.evaluate(() => {
+        const btn = document.querySelector('#btn-close-inbox-drawer') || document.querySelector('#btn-toggle-inbox');
+        if (btn) btn.click();
+      });
+      await sleep(600);
 
-    // 8. Tablet View (768 x 1024)
-    console.log('\n--- 8. Tablet View (768 x 1024) ---');
+      // 4. Standalone Customer Portal
+      console.log(`[${res.name}] 4. Standalone Customer Portal`);
+      await page.goto(`${FRONTEND_URL}/customer`, { waitUntil: 'networkidle0' });
+      await sleep(1200);
+      await takeScreenshot(`customer_portal_desktop_${res.name}.png`);
+
+      // 5. Standalone Agent Dashboard - Copilot Closed
+      console.log(`[${res.name}] 5. Standalone Agent Dashboard - Copilot Closed`);
+      await page.goto(`${FRONTEND_URL}/agent`, { waitUntil: 'networkidle0' });
+      await sleep(1200);
+      await takeScreenshot(`agent_dashboard_copilot_closed_${res.name}.png`);
+
+      // 6. Standalone Agent Dashboard - Copilot Open
+      console.log(`[${res.name}] 6. Standalone Agent Dashboard - Copilot Open`);
+      await page.evaluate(() => {
+        const btn = document.querySelector('#btn-toggle-copilot');
+        if (btn) btn.click();
+      });
+      await sleep(1200);
+      await takeScreenshot(`agent_dashboard_copilot_open_${res.name}.png`);
+    }
+
+    // Responsive Mobile & Tablet Verification
+    console.log('\n--- Responsive Tablet & Mobile Verification ---');
     await page.setViewport({ width: 768, height: 1024, deviceScaleFactor: 1 });
     await page.goto(`${FRONTEND_URL}/split`, { waitUntil: 'networkidle0' });
-    await sleep(1200);
-    await takeScreenshot('08_tablet_view_768x1024.png');
+    await sleep(1000);
+    await takeScreenshot('tablet_view_768x1024.png');
 
-    // 9. Mobile View (375 x 812) - Chat
-    console.log('\n--- 9. Mobile View (375 x 812) - Chat ---');
     await page.setViewport({ width: 375, height: 812, deviceScaleFactor: 1 });
     await page.goto(`${FRONTEND_URL}/agent`, { waitUntil: 'networkidle0' });
-    await sleep(1200);
-    await takeScreenshot('09_mobile_agent_chat_375x812.png');
+    await sleep(1000);
+    await takeScreenshot('mobile_agent_chat_375x812.png');
 
-    // 10. Mobile View - Inbox Tab
-    console.log('\n--- 10. Mobile View - Inbox Tab ---');
     await page.evaluate(() => {
       const btns = Array.from(document.querySelectorAll('button'));
       const inboxBtn = btns.find(b => b.textContent.includes('Inbox'));
       if (inboxBtn) inboxBtn.click();
     });
     await sleep(800);
-    await takeScreenshot('10_mobile_agent_inbox_375x812.png');
+    await takeScreenshot('mobile_agent_inbox_375x812.png');
 
-    // 11. Mobile View - Copilot Tab
-    console.log('\n--- 11. Mobile View - Copilot Tab ---');
     await page.evaluate(() => {
       const btns = Array.from(document.querySelectorAll('button'));
       const copilotTab = btns.find(b => b.textContent.includes('Copilot'));
       if (copilotTab) copilotTab.click();
     });
     await sleep(800);
-    await takeScreenshot('11_mobile_agent_copilot_375x812.png');
+    await takeScreenshot('mobile_agent_copilot_375x812.png');
 
-    // 12. Customer Portal Mobile
-    console.log('\n--- 12. Customer Portal Mobile ---');
     await page.goto(`${FRONTEND_URL}/customer`, { waitUntil: 'networkidle0' });
     await sleep(1000);
-    await takeScreenshot('12_customer_portal_mobile_375x812.png');
+    await takeScreenshot('mobile_customer_portal_375x812.png');
 
-    console.log('\n========================================');
-    console.log('All 12 Screenshots Captured Successfully!');
-    console.log('========================================\n');
+    console.log('\n==================================================');
+    console.log('All Screenshots Across All Breakpoints Captured!');
+    console.log('==================================================\n');
   } finally {
     await browser.close();
     for (const p of processes) {

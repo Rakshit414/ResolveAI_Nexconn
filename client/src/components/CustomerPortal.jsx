@@ -233,38 +233,34 @@ export default function CustomerPortal({
           </div>
         </div>
 
-        {/* Integrated Order Context Strip & Status Bar */}
-        <div className="flex items-center justify-between pt-1.5 border-t border-[#161616] text-xs">
-          <div className="flex items-center space-x-2 min-w-0">
+        {/* Integrated Order Context Strip & Single Status */}
+        <div className="flex items-center justify-between pt-2 border-t border-[#161616] text-xs">
+          <div className="flex items-center space-x-2.5 min-w-0">
             <span className="font-mono text-[#7CFF00] text-xs font-semibold shrink-0">
               #{customer?.order?.orderId}
             </span>
             <span className="text-[#333333]">·</span>
-            <span className="text-[#A0A0A0] text-xs truncate hidden sm:inline">
+            <span className="text-[#CCCCCC] font-medium text-xs truncate">
               {customer?.order?.product}
             </span>
-            <span className="text-[#333333] hidden sm:inline">·</span>
+            <span className="text-[#333333]">·</span>
             <button
               onClick={() => setShowOrderDetails(!showOrderDetails)}
-              className="text-[#8A8A8A] hover:text-[#7CFF00] underline text-xs flex items-center space-x-0.5 shrink-0 transition-colors"
+              className="text-[#8A8A8A] hover:text-[#FFFFFF] underline text-xs flex items-center space-x-0.5 shrink-0 transition-colors"
             >
               <span>{showOrderDetails ? 'Hide tracking' : 'View tracking'}</span>
               {showOrderDetails ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
             </button>
           </div>
 
-          {/* Status Indicator & Action */}
+          {/* Single Prominent Status Indicator & Action (No duplicate status label) */}
           <div className="flex items-center space-x-2 shrink-0">
-            <span className="text-xs text-[#8A8A8A] font-medium hidden sm:inline mr-1">
-              Status: <strong className={ticketStatus === 'Human Requested' ? 'text-[#FF334B]' : 'text-[#7CFF00]'}>{ticketStatus}</strong>
-            </span>
-
             {ticketStatus === 'Resolved' ? (
-              <span id="customer-status-badge-resolved" className="text-xs text-[#7CFF00] font-semibold px-2.5 py-0.5 rounded-full bg-[#7CFF00]/10 border border-[#7CFF00]/40">
+              <span id="customer-status-badge-resolved" className="text-xs text-[#7CFF00] font-semibold px-2.5 py-0.5 rounded-full bg-[#7CFF00]/10 border border-[#7CFF00]/30">
                 Resolved
               </span>
             ) : ticketStatus === 'Human Agent Active' ? (
-              <span id="customer-status-badge-active" className="text-xs text-[#FFFFFF] font-semibold px-2.5 py-0.5 rounded-full bg-[#161616] border border-[#7CFF00]/40 flex items-center space-x-1.5">
+              <span id="customer-status-badge-active" className="text-xs text-[#FFFFFF] font-semibold px-2.5 py-0.5 rounded-full bg-[#161616] border border-[#2A2A2A] flex items-center space-x-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#7CFF00] shadow-neon-sm" />
                 <span>Sarah Lin Active</span>
               </span>
@@ -273,14 +269,20 @@ export default function CustomerPortal({
                 Human Requested
               </span>
             ) : (
-              <button
-                id="btn-request-human"
-                onClick={handleRequestHuman}
-                className="flex items-center space-x-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-[#161616] hover:bg-[#202020] text-[#FFFFFF] border border-[#262626] hover:border-[#7CFF00]/50 transition-colors shadow-sm"
-              >
-                <UserCheck className="w-3.5 h-3.5 text-[#7CFF00]" />
-                <span>Request Human</span>
-              </button>
+              <div className="flex items-center space-x-2">
+                <span id="customer-status-badge-ai" className="text-xs text-[#8A8A8A] font-semibold px-2.5 py-0.5 rounded-full bg-[#161616] border border-[#262626] flex items-center space-x-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#7CFF00]" />
+                  <span>AI Handling</span>
+                </span>
+                <button
+                  id="btn-request-human"
+                  onClick={handleRequestHuman}
+                  className="flex items-center space-x-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-[#161616] hover:bg-[#202020] text-[#FFFFFF] border border-[#262626] hover:border-[#7CFF00]/50 transition-colors shadow-sm"
+                >
+                  <UserCheck className="w-3.5 h-3.5 text-[#7CFF00]" />
+                  <span>Request Human</span>
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -299,7 +301,7 @@ export default function CustomerPortal({
       </div>
 
       {/* Spacious Conversation Stream */}
-      <div id="customer-chat-messages" className="flex-1 overflow-y-auto px-6 lg:px-8 py-6 space-y-4 bg-[#090909]">
+      <div id="customer-chat-messages" className="flex-1 overflow-y-auto px-6 lg:px-8 py-6 space-y-6 bg-[#090909]">
         {messages.map((msg) => {
           const isMe = msg.senderRole === 'customer' || msg.senderId === customer?.id;
           const isSystem = msg.senderRole === 'system';
@@ -319,7 +321,7 @@ export default function CustomerPortal({
               key={msg.id}
               className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
             >
-              <div className="flex items-center space-x-2 mb-1 px-1.5 text-xs text-[#8A8A8A]">
+              <div className="flex items-center space-x-2 mb-1.5 px-1 text-xs text-[#8A8A8A]">
                 <span className={isMe ? 'text-[#7CFF00] font-semibold' : 'text-[#FFFFFF] font-semibold'}>
                   {isMe ? 'You' : msg.senderName || 'Support Agent'}
                 </span>
@@ -330,10 +332,10 @@ export default function CustomerPortal({
               </div>
 
               <div
-                className={`max-w-[72%] rounded-2xl px-5 py-3 text-[14px] leading-relaxed ${
+                className={`max-w-[72%] rounded-2xl px-5 py-3.5 text-[15px] leading-relaxed ${
                   isMe
-                    ? 'bg-[#141414] border border-[#7CFF00]/40 text-[#FFFFFF] shadow-sm'
-                    : 'bg-[#1A1A1A] border border-[#262626] text-[#FFFFFF]'
+                    ? 'bg-[#181818] border border-[#2A2A2A] text-[#FFFFFF]'
+                    : 'bg-[#121212] border border-[#222222] text-[#EAEAEA]'
                 }`}
               >
                 <p className="whitespace-pre-wrap">{msg.text}</p>

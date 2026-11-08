@@ -198,6 +198,13 @@ async function runCustomerSyncTests() {
 
     // Test 6: Switch via Agent Inbox
     console.log('\n--- Test 6: Switch via Agent Inbox Ticket Item ---');
+    // Open inbox drawer if in split view
+    await page.evaluate(() => {
+      const inboxToggle = document.querySelector('#btn-toggle-inbox');
+      if (inboxToggle) inboxToggle.click();
+    });
+    await sleep(600);
+
     await page.evaluate(() => {
       const btns = Array.from(document.querySelectorAll('button'));
       const kabirInbox = btns.find(b => b.textContent.includes('Kabir Verma') && b.querySelector('img'));

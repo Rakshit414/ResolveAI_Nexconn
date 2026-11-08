@@ -5,7 +5,8 @@ import {
   ChevronUp, 
   Check, 
   UserCheck, 
-  Sparkles
+  Sparkles,
+  Inbox
 } from 'lucide-react';
 
 export default function ChatWindow({
@@ -15,6 +16,10 @@ export default function ChatWindow({
   onUpdateStatus,
   isCopilotOpen,
   onToggleCopilot,
+  isSplitView = false,
+  isInboxOpen = false,
+  onToggleInbox,
+  inboxCount = 3,
 }) {
   const [inputText, setInputText] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -70,18 +75,18 @@ export default function ChatWindow({
               <span className="font-bold text-base text-[#FFFFFF] truncate">{customer?.name}</span>
               <span className="text-xs text-[#8A8A8A] font-mono shrink-0">({ticket?.orderId})</span>
               
-              {/* Minimal Status Indicator */}
-              <span className={`hidden sm:inline-block text-xs font-semibold px-2.5 py-0.5 rounded-full border shrink-0 ${
-                isHandoffRequested
-                  ? 'border-[#5C151F] bg-[#250C10] text-[#FF334B]'
-                  : isResolved
-                  ? 'border-[#7CFF00]/40 bg-[#7CFF00]/10 text-[#7CFF00]'
-                  : isAgentActive
-                  ? 'border-[#282828] bg-[#161616] text-[#FFFFFF]'
-                  : 'border-[#222222] text-[#8A8A8A]'
-              }`}>
-                {currentStatus}
-              </span>
+              {/* Single Prominent Status Indicator (Suppressed when resolved to prevent duplicate labels) */}
+              {!isResolved && (
+                <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border shrink-0 ${
+                  isHandoffRequested
+                    ? 'border-[#5C151F] bg-[#250C10] text-[#FF334B]'
+                    : isAgentActive
+                    ? 'border-[#282828] bg-[#161616] text-[#FFFFFF]'
+                    : 'border-[#222222] text-[#8A8A8A]'
+                }`}>
+                  {currentStatus}
+                </span>
+              )}
             </div>
 
             <div className="flex items-center space-x-2 text-xs text-[#8A8A8A] mt-0.5">
@@ -89,7 +94,7 @@ export default function ChatWindow({
               <span>·</span>
               <button
                 onClick={() => setShowOrderDetails(!showOrderDetails)}
-                className="text-[#8A8A8A] hover:text-[#7CFF00] underline flex items-center space-x-0.5 shrink-0 transition-colors text-xs"
+                className="text-[#8A8A8A] hover:text-[#FFFFFF] underline flex items-center space-x-0.5 shrink-0 transition-colors text-xs"
               >
                 <span>{showOrderDetails ? 'Hide order details' : 'Order details'}</span>
                 {showOrderDetails ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
@@ -98,8 +103,27 @@ export default function ChatWindow({
           </div>
         </div>
 
-        {/* Action Controls: Take Over / Resolve / Toggle Copilot */}
-        <div className="flex items-center space-x-2.5 shrink-0">
+        {/* Action Controls: Inbox Toggle (Split View) / Take Over / Resolve / Toggle Copilot */}
+        <div className="flex items-center space-x-2 shrink-0">
+          {/* Split View Compact Inbox Toggle Button */}
+          {isSplitView && onToggleInbox && (
+            <button
+              id="btn-toggle-inbox"
+              onClick={onToggleInbox}
+              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                isInboxOpen
+                  ? 'bg-[#1E1E1E] text-[#7CFF00] border border-[#7CFF00]/40'
+                  : 'bg-[#141414] text-[#8A8A8A] hover:text-[#FFFFFF] border border-[#222222] hover:border-[#7CFF00]/40'
+              }`}
+              title={isInboxOpen ? "Close Inbox" : "Open Inbox"}
+            >
+              <Inbox className="w-3.5 h-3.5 text-[#7CFF00]" />
+              <span className="hidden sm:inline">Inbox</span>
+              <span className="text-[10px] font-mono px-1.5 py-0.2 bg-[#7CFF00]/10 text-[#7CFF00] rounded font-bold">
+                {inboxCount}
+              </span>
+            </button>
+          )}
           {/* Take Over Button when human requested */}
           {isHandoffRequested && (
             <button
@@ -174,8 +198,8 @@ export default function ChatWindow({
         </div>
       )}
 
-      {/* Messages Stream - Generous readable spacing with natural line length and 14-15px typography */}
-      <div className="flex-1 overflow-y-auto px-8 py-6 space-y-5 bg-[#090909]">
+      {/* Messages Stream - Generous readable spacing with natural line length and 15px typography */}
+      <div className="flex-1 overflow-y-auto px-6 md:px-8 py-6 space-y-6 bg-[#090909]">
         {messages.map((msg) => {
           const isAgent = msg.senderRole === 'agent' || msg.senderId === 'agent_sarah';
           const isSystem = msg.senderRole === 'system';
@@ -196,7 +220,7 @@ export default function ChatWindow({
               className={`flex flex-col ${isAgent ? 'items-end' : 'items-start'}`}
             >
               {/* Message Meta Info */}
-              <div className="flex items-center space-x-2 mb-1 px-1.5 text-xs text-[#8A8A8A]">
+              <div className="flex items-center space-x-2 mb-1.5 px-1 text-xs text-[#8A8A8A]">
                 <span className={`font-semibold ${isAgent ? 'text-[#7CFF00]' : 'text-[#FFFFFF]'}`}>
                   {isAgent ? 'Sarah Lin' : customer?.name}
                 </span>
@@ -206,12 +230,12 @@ export default function ChatWindow({
                 </span>
               </div>
 
-              {/* Message Bubble: Natural max-width, comfortable padding, 14-15px text */}
+              {/* Message Bubble: Natural max-width, comfortable padding, 15px text */}
               <div
-                className={`max-w-[70%] rounded-2xl px-5 py-3.5 text-[14px] leading-relaxed ${
+                className={`max-w-[72%] rounded-2xl px-5 py-3.5 text-[15px] leading-relaxed ${
                   isAgent
-                    ? 'bg-[#141414] border border-[#7CFF00]/40 text-[#FFFFFF] shadow-sm'
-                    : 'bg-[#1A1A1A] border border-[#282828] text-[#FFFFFF]'
+                    ? 'bg-[#181818] border border-[#2A2A2A] text-[#FFFFFF]'
+                    : 'bg-[#121212] border border-[#222222] text-[#EAEAEA]'
                 }`}
               >
                 <p className="whitespace-pre-wrap">{msg.text}</p>

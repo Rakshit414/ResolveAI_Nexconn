@@ -255,6 +255,12 @@ async function runMilestone4FullE2E() {
       assert(`${testPrefix}.5: AI is suppressed from sending unapproved messages`, msgCountBefore === msgCountAfter);
 
       // 6. AI Copilot suggestion & Agent approval
+      await pageAgent.evaluate(() => {
+        const btn = document.querySelector('#btn-toggle-copilot');
+        if (btn && !document.querySelector('#btn-close-copilot')) btn.click();
+      });
+      await sleep(1500);
+
       let clickedApprove = false;
       for (let i = 0; i < 8; i++) {
         clickedApprove = await pageAgent.evaluate(() => {

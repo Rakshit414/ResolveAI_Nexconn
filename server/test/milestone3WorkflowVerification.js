@@ -163,6 +163,13 @@ async function runMilestone3Verification() {
     // SCENARIO 2: AI response suggestion and agent approval
     // =======================================================================
     console.log('\n--- SCENARIO 2: AI response suggestion and agent approval ---');
+    // Open Copilot drawer if closed
+    await pageAgent.evaluate(() => {
+      const btn = document.querySelector('#btn-toggle-copilot');
+      if (btn) btn.click();
+    });
+    await sleep(2000);
+
     const hasCopilot = await pageAgent.evaluate(() => {
       return document.body.innerText.includes('AI Copilot') && 
         (document.body.innerText.includes('Approve & Send') || document.body.innerText.includes('Send Reply'));

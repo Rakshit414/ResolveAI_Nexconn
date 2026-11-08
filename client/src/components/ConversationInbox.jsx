@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { Search, PanelLeftClose, PanelLeftOpen, X } from 'lucide-react';
 
 export default function ConversationInbox({
   tickets,
@@ -12,6 +12,7 @@ export default function ConversationInbox({
   isCollapsed = false,
   onToggleCollapse,
   isSplitView = false,
+  onClose,
 }) {
   const filters = [
     { id: 'All', label: 'All' },
@@ -108,15 +109,27 @@ export default function ConversationInbox({
             </span>
           </div>
 
-          {onToggleCollapse && (
-            <button
-              onClick={onToggleCollapse}
-              className="p-1 rounded-lg text-[#8A8A8A] hover:text-[#FFFFFF] hover:bg-[#181818] transition-colors"
-              title="Collapse to icon rail"
-            >
-              <PanelLeftClose className="w-4 h-4" />
-            </button>
-          )}
+          <div className="flex items-center space-x-1">
+            {onToggleCollapse && !onClose && (
+              <button
+                onClick={onToggleCollapse}
+                className="p-1 rounded-lg text-[#8A8A8A] hover:text-[#FFFFFF] hover:bg-[#181818] transition-colors"
+                title="Collapse to icon rail"
+              >
+                <PanelLeftClose className="w-4 h-4" />
+              </button>
+            )}
+            {onClose && (
+              <button
+                id="btn-close-inbox-drawer"
+                onClick={onClose}
+                className="p-1 rounded-lg text-[#8A8A8A] hover:text-[#FFFFFF] hover:bg-[#181818] transition-colors"
+                title="Close Inbox"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Search Input */}

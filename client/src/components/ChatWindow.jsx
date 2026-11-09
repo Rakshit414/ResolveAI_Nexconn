@@ -6,8 +6,12 @@ import {
   Check, 
   UserCheck, 
   Sparkles,
-  Inbox
+  Inbox,
+  Globe,
+  X,
+  Image as ImageIcon
 } from 'lucide-react';
+import { translateText } from '../services/api';
 
 export default function ChatWindow({
   ticket,
@@ -24,6 +28,9 @@ export default function ChatWindow({
   const [inputText, setInputText] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [showOrderDetails, setShowOrderDetails] = useState(false);
+  const [lightboxImage, setLightboxImage] = useState(null);
+  const [translationsMap, setTranslationsMap] = useState({});
+  const [translatingIds, setTranslatingIds] = useState(new Set());
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
@@ -43,8 +50,39 @@ export default function ChatWindow({
     }
   };
 
+  const handleTranslateMessage = async (msgId, text, langHint) => {
+    if (translationsMap[msgId] || translatingIds.has(msgId)) return;
+    setTranslatingIds((prev) => new Set(prev).add(msgId));
+    try {
+      const res = await translateText({
+        text,
+        targetLanguage: 'en',
+        sourceLanguage: langHint || 'auto',
+      });
+      if (res?.translatedText) {
+        setTranslationsMap((prev) => ({
+          ...prev,
+          [msgId]: res.translatedText,
+        }));
+      }
+    } catch (err) {
+      console.warn('Translation error:', err);
+    } finally {
+      setTranslatingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(msgId);
+        return next;
+      });
+    }
+  };
+
   const customer = ticket?.customer;
   const order = customer?.order;
+
+  // Detect if customer uses a non-English language (e.g. Hindi or Marathi)
+  const isDevanagari = (text) => /[\u0900-\u097F]/.test(text || '');
+  const detectedLang = messages.find(m => m.metadata?.language && m.metadata?.language !== 'en')?.metadata?.language
+    || (messages.some(m => isDevanagari(m.text)) ? 'hi' : null);
 
   // Canonical status mapping
   const currentStatus = ticket?.status === 'Human Assistance Requested' || ticket?.status === 'Human Requested'
@@ -60,11 +98,31 @@ export default function ChatWindow({
   const isResolved = currentStatus === 'Resolved';
 
   return (
-    <div className="flex-1 h-full min-w-0 flex flex-col bg-[#090909] overflow-hidden">
+    <div className="flex-1 h-full min-w-0 flex flex-col bg-[#090909] overflow-hidden relative">
       {/* Workspace Header: Clean, Uncluttered, Single Row */}
       <div className="px-6 py-4 bg-[#0D0D0D] border-b border-[#1A1A1A] flex items-center justify-between shrink-0 gap-4">
-        {/* Customer & Order Summary */}
+        {/* Customer & Order Summary (with Left-aligned Inbox Toggle for Split View) */}
         <div className="flex items-center space-x-3.5 min-w-0">
+          {/* Split View Compact Inbox Toggle Button on the Left */}
+          {isSplitView && onToggleInbox && (
+            <button
+              id="btn-toggle-inbox"
+              onClick={onToggleInbox}
+              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shrink-0 ${
+                isInboxOpen
+                  ? 'bg-[#1E1E1E] text-[#7CFF00] border border-[#7CFF00]/40'
+                  : 'bg-[#141414] text-[#8A8A8A] hover:text-[#FFFFFF] border border-[#222222] hover:border-[#7CFF00]/40'
+              }`}
+              title={isInboxOpen ? "Close Inbox" : "Open Inbox"}
+            >
+              <Inbox className="w-3.5 h-3.5 text-[#7CFF00]" />
+              <span className="hidden sm:inline">Inbox</span>
+              <span className="text-[10px] font-mono px-1.5 py-0.2 bg-[#7CFF00]/10 text-[#7CFF00] rounded font-bold">
+                {inboxCount}
+              </span>
+            </button>
+          )}
+
           <img
             src={customer?.avatar}
             alt={customer?.name}
@@ -75,7 +133,7 @@ export default function ChatWindow({
               <span className="font-bold text-base text-[#FFFFFF] truncate">{customer?.name}</span>
               <span className="text-xs text-[#8A8A8A] font-mono shrink-0">({ticket?.orderId})</span>
               
-              {/* Single Prominent Status Indicator (Suppressed when resolved to prevent duplicate labels) */}
+              {/* Single Prominent Status Indicator */}
               {!isResolved && (
                 <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border shrink-0 ${
                   isHandoffRequested
@@ -85,6 +143,14 @@ export default function ChatWindow({
                     : 'border-[#222222] text-[#8A8A8A]'
                 }`}>
                   {currentStatus}
+                </span>
+              )}
+
+              {/* Language Indicator Badge if Customer is using non-English */}
+              {detectedLang && (
+                <span className="flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#121E28] border border-[#1E3A5F] text-[#60A5FA] shrink-0">
+                  <Globe className="w-3 h-3" />
+                  <span>{detectedLang === 'hi' ? 'Hindi' : detectedLang === 'mr' ? 'Marathi' : detectedLang.toUpperCase()}</span>
                 </span>
               )}
             </div>
@@ -103,27 +169,8 @@ export default function ChatWindow({
           </div>
         </div>
 
-        {/* Action Controls: Inbox Toggle (Split View) / Take Over / Resolve / Toggle Copilot */}
+        {/* Action Controls: Take Over / Resolve / Toggle Copilot */}
         <div className="flex items-center space-x-2 shrink-0">
-          {/* Split View Compact Inbox Toggle Button */}
-          {isSplitView && onToggleInbox && (
-            <button
-              id="btn-toggle-inbox"
-              onClick={onToggleInbox}
-              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-                isInboxOpen
-                  ? 'bg-[#1E1E1E] text-[#7CFF00] border border-[#7CFF00]/40'
-                  : 'bg-[#141414] text-[#8A8A8A] hover:text-[#FFFFFF] border border-[#222222] hover:border-[#7CFF00]/40'
-              }`}
-              title={isInboxOpen ? "Close Inbox" : "Open Inbox"}
-            >
-              <Inbox className="w-3.5 h-3.5 text-[#7CFF00]" />
-              <span className="hidden sm:inline">Inbox</span>
-              <span className="text-[10px] font-mono px-1.5 py-0.2 bg-[#7CFF00]/10 text-[#7CFF00] rounded font-bold">
-                {inboxCount}
-              </span>
-            </button>
-          )}
           {/* Take Over Button when human requested */}
           {isHandoffRequested && (
             <button
@@ -193,8 +240,26 @@ export default function ChatWindow({
           </div>
           <div>
             <span className="block text-[10px] uppercase font-bold text-[#555555]">Order Date & Price</span>
-            <span className="text-[#FFFFFF] mt-0.5 block">{order.purchaseDate} (${order.price.toFixed(2)})</span>
+            <span className="text-[#FFFFFF] mt-0.5 block">{order.purchaseDate} (${order.price?.toFixed(2) || '0.00'})</span>
           </div>
+        </div>
+      )}
+
+      {/* Customer Resolution Feedback Banner if submitted */}
+      {ticket?.feedback && (
+        <div className="mx-6 md:mx-8 mt-3 p-3 rounded-xl bg-[#111A10] border border-[#7CFF00]/30 text-xs flex items-center justify-between animate-fadeIn shrink-0 shadow-sm">
+          <div className="flex items-center space-x-2.5">
+            <span className="text-[#7CFF00] font-bold">Customer Feedback:</span>
+            <span className="text-[#FFFFFF] font-medium">
+              {ticket.feedback.rating ? '⭐'.repeat(ticket.feedback.rating) : 'Rated'}
+            </span>
+            {ticket.feedback.comment && (
+              <span className="text-[#AAAAAA] italic truncate max-w-md">"{ticket.feedback.comment}"</span>
+            )}
+          </div>
+          <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-[#7CFF00]/10 text-[#7CFF00] font-bold border border-[#7CFF00]/20 shrink-0">
+            {ticket.feedback.resolved ? 'Resolved' : 'Needs Followup'}
+          </span>
         </div>
       )}
 
@@ -203,6 +268,12 @@ export default function ChatWindow({
         {messages.map((msg) => {
           const isAgent = msg.senderRole === 'agent' || msg.senderId === 'agent_sarah';
           const isSystem = msg.senderRole === 'system';
+          const att = msg.attachment || msg.metadata?.attachment;
+          const msgLang = msg.metadata?.language;
+          const hasDevanagari = isDevanagari(msg.text);
+          const needsTranslation = !isAgent && !isSystem && (msgLang === 'hi' || msgLang === 'mr' || hasDevanagari);
+          const translatedText = translationsMap[msg.id] || msg.metadata?.translatedText;
+          const isTranslating = translatingIds.has(msg.id);
 
           if (isSystem) {
             return (
@@ -228,9 +299,14 @@ export default function ChatWindow({
                 <span className="font-mono text-[11px]">
                   {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </span>
+                {needsTranslation && (
+                  <span className="text-[10px] text-[#60A5FA] font-medium bg-[#121E28] px-1.5 py-0.2 rounded">
+                    {msgLang === 'hi' ? 'Hindi' : msgLang === 'mr' ? 'Marathi' : 'Devanagari'}
+                  </span>
+                )}
               </div>
 
-              {/* Message Bubble: Natural max-width, comfortable padding, 15px text */}
+              {/* Message Bubble */}
               <div
                 className={`max-w-[72%] rounded-2xl px-5 py-3.5 text-[15px] leading-relaxed ${
                   isAgent
@@ -239,6 +315,56 @@ export default function ChatWindow({
                 }`}
               >
                 <p className="whitespace-pre-wrap">{msg.text}</p>
+
+                {/* Image Attachment Rendering */}
+                {att && att.dataUrl && (
+                  <div className="mt-3 pt-2.5 border-t border-[#222222] space-y-1.5">
+                    <div 
+                      onClick={() => setLightboxImage(att.dataUrl)}
+                      className="cursor-pointer group relative overflow-hidden rounded-xl border border-[#2A2A2A] max-w-[280px] bg-[#0A0A0A] hover:border-[#7CFF00]/50 transition-colors"
+                    >
+                      <img
+                        src={att.dataUrl}
+                        alt={att.name || 'Attachment'}
+                        className="max-h-52 w-full object-cover group-hover:scale-105 transition-transform duration-200"
+                      />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-xs text-white font-medium">
+                        Click to view full photo
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2 text-[11px] text-[#8A8A8A]">
+                      <ImageIcon className="w-3.5 h-3.5 text-[#7CFF00] shrink-0" />
+                      <span className="truncate max-w-[180px] text-[#CCCCCC]">{att.name}</span>
+                      {att.size && <span>({Math.round(att.size / 1024)} KB)</span>}
+                    </div>
+                  </div>
+                )}
+
+                {/* Multilingual Translation Translation Box for Agent */}
+                {needsTranslation && (
+                  <div className="mt-2.5 pt-2 border-t border-[#262626] text-xs">
+                    {translatedText ? (
+                      <div className="space-y-1 bg-[#161616] p-2.5 rounded-lg border border-[#242424]">
+                        <div className="flex items-center space-x-1.5 text-[10px] text-[#7CFF00] font-semibold">
+                          <Globe className="w-3 h-3" />
+                          <span>English Translation:</span>
+                        </div>
+                        <p className="text-[#E0E0E0] italic text-xs leading-relaxed">
+                          "{translatedText}"
+                        </p>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => handleTranslateMessage(msg.id, msg.text, msgLang)}
+                        disabled={isTranslating}
+                        className="text-[11px] text-[#60A5FA] hover:text-[#93C5FD] underline flex items-center space-x-1 transition-colors"
+                      >
+                        <Globe className="w-3 h-3" />
+                        <span>{isTranslating ? 'Translating...' : 'Translate to English'}</span>
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           );
@@ -265,6 +391,29 @@ export default function ChatWindow({
           <Send className="w-3.5 h-3.5" />
         </button>
       </form>
+
+      {/* Lightbox Modal for Photo Attachments */}
+      {lightboxImage && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn"
+          onClick={() => setLightboxImage(null)}
+        >
+          <div className="relative max-w-4xl max-h-[90vh] bg-[#111111] rounded-2xl border border-[#2A2A2A] overflow-hidden p-2 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setLightboxImage(null)}
+              className="absolute top-4 right-4 p-1.5 rounded-full bg-black/70 text-white hover:bg-black/90 transition-colors z-10"
+              title="Close Full Image"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <img
+              src={lightboxImage}
+              alt="Full Resolution Attachment"
+              className="max-h-[82vh] w-auto max-w-full rounded-xl object-contain mx-auto"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

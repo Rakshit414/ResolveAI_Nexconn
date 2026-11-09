@@ -60,6 +60,12 @@ export const resetTickets = () =>
     method: 'POST',
   });
 
+export const submitResolutionFeedback = (id, feedback) =>
+  fetchAPI(`/api/tickets/${id}/feedback`, {
+    method: 'POST',
+    body: JSON.stringify(feedback),
+  });
+
 // AI Copilot API
 export const analyzeConversation = (data) =>
   fetchAPI('/api/ai/analyze', {
@@ -75,6 +81,12 @@ export const summarizeConversation = (data) =>
 
 export const getSuggestedReply = (data) =>
   fetchAPI('/api/ai/suggest-reply', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+
+export const translateText = (data) =>
+  fetchAPI('/api/ai/translate', {
     method: 'POST',
     body: JSON.stringify(data),
   });

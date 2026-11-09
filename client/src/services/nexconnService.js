@@ -145,6 +145,24 @@ class NexconnManager {
     return updated;
   }
 
+  setTicketFeedback(ticketId, feedback) {
+    if (!ticketId || !feedback) return;
+    const current = this.ticketStatuses.get(ticketId) || {};
+    const updated = {
+      ...current,
+      feedback,
+      lastUpdated: new Date().toISOString(),
+    };
+    this.ticketStatuses.set(ticketId, updated);
+    this.saveTicketStatuses();
+    return updated;
+  }
+
+  getTicketFeedback(ticketId) {
+    if (!ticketId) return null;
+    return this.ticketStatuses.get(ticketId)?.feedback || null;
+  }
+
   /**
    * Seed initial conversation history per channel
    */
@@ -523,14 +541,15 @@ class NexconnManager {
    * 3. Message recorded in channel history exactly once.
    * 4. Dispatched ONLY to that channel's subscribers.
    */
-  async sendMessage({ targetUserId, channelId, text, metadata = {} }) {
-    if (!text || !text.trim() || !channelId) {
-      console.warn('[Nexconn] Missing required params for sendMessage:', { channelId, text });
+  async sendMessage({ targetUserId, channelId, text, metadata = {}, attachment = null }) {
+    const trimmedText = String(text || '').trim();
+    if ((!trimmedText && !attachment) || !channelId) {
+      console.warn('[Nexconn] Missing required params for sendMessage:', { channelId, text, attachment });
       return null;
     }
 
-    const trimmedText = text.trim();
-    const flightKey = `${channelId}_${targetUserId}_${trimmedText}`;
+    const messageText = trimmedText || (attachment ? `[Attachment: ${attachment.name}]` : '');
+    const flightKey = `${channelId}_${targetUserId}_${messageText}_${attachment?.name || ''}`;
 
     // Prevent rapid duplicate clicks on the exact same message
     if (this.inFlightSends.has(flightKey)) {
@@ -555,10 +574,12 @@ class NexconnManager {
         senderRole: this.currentUser?.role ? 'agent' : 'customer',
         senderAvatar: this.currentUser?.avatar,
         targetUserId,
-        text: trimmedText,
+        text: messageText,
+        attachment,
         timestamp,
         metadata: {
           ...metadata,
+          attachment,
           channelId,
         },
       };
@@ -575,8 +596,8 @@ class NexconnManager {
 
           if (channel && typeof channel.sendMessage === 'function') {
             const params = SendTextMessageParams
-              ? new SendTextMessageParams({ text: trimmedText })
-              : { content: { text: trimmedText } };
+              ? new SendTextMessageParams({ text: messageText })
+              : { content: { text: messageText } };
             const sdkResult = await channel.sendMessage(params);
             console.log('[Nexconn] SDK sendMessage to', targetUserId, 'result:', sdkResult);
             if (sdkResult?.data?.messageId) {

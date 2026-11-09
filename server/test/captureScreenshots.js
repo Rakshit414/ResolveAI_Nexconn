@@ -112,13 +112,13 @@ async function main() {
       console.log(`==================================================`);
       await page.setViewport({ width: res.width, height: res.height, deviceScaleFactor: 1 });
 
-      // 1. Split View - Copilot Closed (Default)
-      console.log(`[${res.name}] 1. Split View - Copilot Closed`);
+      // 1. Split View - Both Drawers Closed (Default)
+      console.log(`[${res.name}] 1. Split View - Both Drawers Closed`);
       await page.goto(`${FRONTEND_URL}/split`, { waitUntil: 'networkidle0' });
       await sleep(1500);
       await takeScreenshot(`split_view_copilot_closed_${res.name}.png`);
 
-      // 2. Split View - Copilot Open
+      // 2. Split View - Copilot Open (Inbox Closed)
       console.log(`[${res.name}] 2. Split View - Copilot Open`);
       await page.evaluate(() => {
         const btn = document.querySelector('#btn-toggle-copilot');
@@ -127,14 +127,7 @@ async function main() {
       await sleep(1200);
       await takeScreenshot(`split_view_copilot_open_${res.name}.png`);
 
-      // Close Copilot drawer
-      await page.evaluate(() => {
-        const btn = document.querySelector('#btn-close-copilot') || document.querySelector('#btn-toggle-copilot');
-        if (btn) btn.click();
-      });
-      await sleep(600);
-
-      // 3. Split View - Inbox Drawer Open
+      // 3. Split View - Switch directly to Inbox Drawer (Copilot Closes Automatically)
       console.log(`[${res.name}] 3. Split View - Inbox Drawer Open`);
       await page.evaluate(() => {
         const btn = document.querySelector('#btn-toggle-inbox');
@@ -150,8 +143,8 @@ async function main() {
       });
       await sleep(600);
 
-      // 4. Standalone Customer Portal
-      console.log(`[${res.name}] 4. Standalone Customer Portal`);
+      // 4. Standalone Customer Portal - English
+      console.log(`[${res.name}] 4. Standalone Customer Portal (English)`);
       await page.goto(`${FRONTEND_URL}/customer`, { waitUntil: 'networkidle0' });
       await sleep(1200);
       await takeScreenshot(`customer_portal_desktop_${res.name}.png`);
@@ -171,6 +164,26 @@ async function main() {
       await sleep(1200);
       await takeScreenshot(`agent_dashboard_copilot_open_${res.name}.png`);
     }
+
+    // Multilingual & CX Feature Highlights
+    console.log('\n--- Multilingual Support Customer Screenshots ---');
+    await page.setViewport({ width: 1536, height: 864, deviceScaleFactor: 1 });
+    await page.goto(`${FRONTEND_URL}/customer`, { waitUntil: 'networkidle0' });
+    await sleep(1000);
+
+    // Hindi
+    await page.select('#customer-language-select', 'hi');
+    await sleep(1000);
+    await takeScreenshot('customer_portal_hindi_1536x864.png');
+
+    // Marathi
+    await page.select('#customer-language-select', 'mr');
+    await sleep(1000);
+    await takeScreenshot('customer_portal_marathi_1536x864.png');
+
+    // Return to English
+    await page.select('#customer-language-select', 'en');
+    await sleep(1000);
 
     // Responsive Mobile & Tablet Verification
     console.log('\n--- Responsive Tablet & Mobile Verification ---');

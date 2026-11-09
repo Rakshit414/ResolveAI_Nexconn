@@ -231,6 +231,37 @@ router.post('/:id/resolve', async (req, res) => {
   });
 });
 
+// POST /api/tickets/:id/feedback - Customer submits resolution feedback
+router.post('/:id/feedback', async (req, res) => {
+  const index = tickets.findIndex(t => t.id === req.params.id || t.orderId === req.params.id);
+  if (index === -1) {
+    return res.status(404).json({ success: false, error: 'Ticket not found' });
+  }
+
+  const { resolved, rating, comment } = req.body;
+  if (resolved === undefined && rating === undefined) {
+    return res.status(400).json({ success: false, error: 'Feedback must contain at least resolved status or rating' });
+  }
+
+  const feedbackData = {
+    resolved: resolved === true,
+    rating: typeof rating === 'number' ? Math.max(1, Math.min(5, Math.round(rating))) : 5,
+    comment: String(comment || '').trim().substring(0, 500),
+    submittedAt: new Date().toISOString(),
+  };
+
+  tickets[index].feedback = feedbackData;
+  tickets[index].lastUpdated = new Date().toISOString();
+  await saveTicketsAtomic(tickets);
+
+  res.json({
+    success: true,
+    message: 'Resolution feedback recorded successfully',
+    feedback: feedbackData,
+    ticket: tickets[index],
+  });
+});
+
 // POST /api/tickets/reset - Reset tickets to initial seed state (Protected Demo/Dev endpoint)
 router.post('/reset', async (req, res) => {
   // Security protection: Prevent unauthorized resets in strict production mode unless demo override is configured

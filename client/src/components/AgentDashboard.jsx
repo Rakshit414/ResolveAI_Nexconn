@@ -17,11 +17,12 @@ export default function AgentDashboard({
   const [messagesMap, setMessagesMap] = useState({});
   const [activeFilter, setActiveFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
-  // Closed by default, opens as a floating overlay drawer over the conversation workspace
-  const [isCopilotOpen, setIsCopilotOpen] = useState(false);
+  
+  // Single active drawer panel in Split View: 'none' | 'inbox' | 'copilot' (strictly mutually exclusive)
+  const [splitPanel, setSplitPanel] = useState('none');
+  // Standalone Copilot toggle
+  const [isCopilotStandaloneOpen, setIsCopilotStandaloneOpen] = useState(false);
   const [isInboxCollapsed, setIsInboxCollapsed] = useState(false);
-  // In Split View, inbox is closed by default to give conversation full width; can be toggled as an overlay drawer
-  const [isInboxDrawerOpen, setIsInboxDrawerOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState('chat'); // 'inbox' | 'chat' | 'copilot'
   const [stats, setStats] = useState({
     total: 3,
@@ -83,6 +84,9 @@ export default function AgentDashboard({
               const remote = res.tickets.find((rt) => rt.id === t.id);
               if (remote) {
                 nexconnService.setTicketStatus(t.id, remote.status, { lastUpdated: remote.lastUpdated });
+                if (remote.feedback) {
+                  nexconnService.setTicketFeedback(t.id, remote.feedback);
+                }
                 return {
                   ...t,
                   status: remote.status,
@@ -92,6 +96,7 @@ export default function AgentDashboard({
                   summary: remote.summary || t.summary,
                   suggestedReply: remote.suggestedReply || t.suggestedReply,
                   pendingAction: remote.pendingAction || t.pendingAction,
+                  feedback: remote.feedback || t.feedback,
                 };
               }
               return t;
@@ -132,6 +137,17 @@ export default function AgentDashboard({
           } else if (newMsg.text.includes('marked as resolved')) {
             s = 'Resolved';
           }
+        }
+
+        if (newMsg.metadata?.feedback) {
+          const fb = newMsg.metadata.feedback;
+          nexconnService.setTicketFeedback(t.id, fb);
+          setTickets((prev) =>
+            prev.map((item) => item.id === t.id ? { ...item, feedback: fb } : item)
+          );
+          setSelectedTicket((prev) =>
+            prev?.id === t.id ? { ...prev, feedback: fb } : prev
+          );
         }
 
         if (s && isLive) {
@@ -436,18 +452,20 @@ export default function AgentDashboard({
           </div>
         )}
 
-        {/* In Split View Mode: Compact Slide-Out Inbox Drawer on Left */}
-        {isSplitView && isInboxDrawerOpen && (
-          <div className="absolute left-0 top-0 bottom-0 z-30 w-[270px] max-w-[85%] h-full shadow-2xl animate-in slide-in-from-left duration-200">
+        {/* In Split View Mode: Compact Slide-Out Inbox Drawer on Left (Mutually Exclusive with Copilot) */}
+        {isSplitView && splitPanel === 'inbox' && (
+          <div className="absolute left-0 top-0 bottom-[68px] z-30 w-[280px] max-w-[85%] shadow-2xl animate-in slide-in-from-left duration-200 border-r border-[#1E1E1E]">
             <ConversationInbox
               tickets={filteredTickets}
               selectedTicket={selectedTicket}
               onSelectTicket={(t) => {
-                const currentStatus = nexconnService.getTicketStatus(t.id)?.status || t.status;
+                const stored = nexconnService.getTicketStatus(t.id);
+                const currentStatus = stored?.status || t.status;
                 const updatedTicket = {
                   ...t,
                   status: currentStatus,
                   humanRequested: currentStatus === 'Human Requested',
+                  feedback: stored?.feedback || t.feedback,
                 };
                 setSelectedTicket(updatedTicket);
                 if (onSelectTicketId) onSelectTicketId(t.id);
@@ -462,7 +480,7 @@ export default function AgentDashboard({
                     setTickets((prev) => prev.map((item) => item.id === t.id ? { ...item, ...res.ticket } : item));
                   }
                 }).catch(() => {});
-                setIsInboxDrawerOpen(false);
+                setSplitPanel('none');
               }}
               activeFilter={activeFilter}
               onSelectFilter={setActiveFilter}
@@ -470,7 +488,7 @@ export default function AgentDashboard({
               onSearchChange={setSearchQuery}
               isCollapsed={false}
               isSplitView={true}
-              onClose={() => setIsInboxDrawerOpen(false)}
+              onClose={() => setSplitPanel('none')}
             />
           </div>
         )}
@@ -485,11 +503,21 @@ export default function AgentDashboard({
               messages={messagesMap[selectedTicket.id] || nexconnService.getChannelMessages(selectedTicket.channelId || `channel_${selectedTicket.orderId}`)}
               onSendMessage={handleSendMessage}
               onUpdateStatus={handleUpdateStatus}
-              isCopilotOpen={isCopilotOpen}
-              onToggleCopilot={() => setIsCopilotOpen(!isCopilotOpen)}
+              isCopilotOpen={isSplitView ? splitPanel === 'copilot' : isCopilotStandaloneOpen}
+              onToggleCopilot={() => {
+                if (isSplitView) {
+                  setSplitPanel((prev) => prev === 'copilot' ? 'none' : 'copilot');
+                } else {
+                  setIsCopilotStandaloneOpen((prev) => !prev);
+                }
+              }}
               isSplitView={isSplitView}
-              isInboxOpen={isInboxDrawerOpen}
-              onToggleInbox={() => setIsInboxDrawerOpen(!isInboxDrawerOpen)}
+              isInboxOpen={isSplitView ? splitPanel === 'inbox' : !isInboxCollapsed}
+              onToggleInbox={() => {
+                if (isSplitView) {
+                  setSplitPanel((prev) => prev === 'inbox' ? 'none' : 'inbox');
+                }
+              }}
               inboxCount={filteredTickets.length}
             />
           ) : (
@@ -499,16 +527,22 @@ export default function AgentDashboard({
           )}
         </div>
 
-        {/* Real Overlay Drawer: Floats over the conversation workspace on the right without resizing it! */}
-        {(isCopilotOpen || mobileTab === 'copilot') && selectedTicket && (
-          <div className={`absolute right-0 top-0 bottom-0 z-30 w-[360px] md:w-[380px] max-w-[85%] h-full shadow-2xl animate-in slide-in-from-right duration-200 ${
+        {/* Real Overlay Drawer: Floats over the conversation workspace on the right without resizing it! (Mutually Exclusive with Inbox in Split View) */}
+        {((isSplitView ? splitPanel === 'copilot' : isCopilotStandaloneOpen) || mobileTab === 'copilot') && selectedTicket && (
+          <div className={`absolute right-0 top-0 ${isSplitView ? 'bottom-[68px]' : 'bottom-0'} z-30 w-[360px] md:w-[380px] max-w-[85%] shadow-2xl animate-in slide-in-from-right duration-200 border-l border-[#1E1E1E] ${
             mobileTab === 'copilot' ? 'block w-full max-w-full' : 'hidden md:block'
           }`}>
             <AICopilotPanel
               ticket={selectedTicket}
               messages={messagesMap[selectedTicket.id] || nexconnService.getChannelMessages(selectedTicket.channelId || `channel_${selectedTicket.orderId}`)}
               onApproveAndSend={handleSendMessage}
-              onClose={() => setIsCopilotOpen(false)}
+              onClose={() => {
+                if (isSplitView) {
+                  setSplitPanel('none');
+                } else {
+                  setIsCopilotStandaloneOpen(false);
+                }
+              }}
             />
           </div>
         )}

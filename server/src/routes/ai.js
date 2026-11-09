@@ -290,4 +290,110 @@ Return valid JSON without markdown fences:
   });
 });
 
+/**
+ * POST /api/ai/translate
+ * Translates customer support messages between English, Hindi, and Marathi.
+ * Preserves product names, order IDs (#NC...), tracking numbers, prices ($...), and policies untranslated.
+ */
+router.post('/translate', async (req, res) => {
+  const { text, targetLanguage = 'en', sourceLanguage = 'auto' } = req.body;
+  if (!text || typeof text !== 'string') {
+    return res.status(400).json({ success: false, error: 'text string is required' });
+  }
+
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return res.json({ success: true, originalText: text, translatedText: text, targetLanguage });
+  }
+
+  if (targetLanguage === sourceLanguage) {
+    return res.json({ success: true, originalText: text, translatedText: text, targetLanguage });
+  }
+
+  const langNames = {
+    en: 'English',
+    hi: 'Hindi',
+    mr: 'Marathi',
+  };
+
+  const targetLangName = langNames[targetLanguage] || 'English';
+
+  const systemPrompt = `You are Resolve AI's multilingual translator for customer support.
+Translate the text accurately into ${targetLangName}.
+CRITICAL RULES:
+1. Preserve all Order IDs (e.g. NC1021, #NC1021), product names (e.g. NovaSprint Pro, NovaPulse, NovaBass), tracking numbers, monetary amounts ($149.99), dates, and email addresses UNTRANSLATED in their exact Latin characters.
+2. Provide a natural, polite customer support translation.
+3. Return ONLY a valid JSON object matching this schema without markdown fences:
+{
+  "translatedText": "the translated string",
+  "detectedLanguage": "en" | "hi" | "mr"
+}`;
+
+  const prompt = `${systemPrompt}\n\nText to translate: "${trimmed}"\n\nJSON Output:`;
+  const parsed = await callGemini(prompt);
+  if (parsed?.translatedText) {
+    return res.json({
+      success: true,
+      source: 'gemini',
+      originalText: text,
+      translatedText: parsed.translatedText,
+      targetLanguage,
+      detectedLanguage: parsed.detectedLanguage || sourceLanguage,
+    });
+  }
+
+  // Fallback translations for common phrases
+  const fallbackDict = {
+    'en_hi': {
+      'Hi, I ordered the NovaSprint Pro shoes 6 days ago (Order #NC1021). The tracking hasn\'t moved in 4 days. Where is my order?':
+        'नमस्ते, मैंने 6 दिन पहले NovaSprint Pro जूते (Order #NC1021) ऑर्डर किए थे। 4 दिनों से ट्रैकिंग आगे नहीं बढ़ी है। मेरा ऑर्डर कहाँ है?',
+      'Can you check the current tracking status?':
+        'क्या आप वर्तमान ट्रैकिंग स्थिति देख सकते हैं?',
+      'What is your return and refund window?':
+        'आपकी वापसी और धनवापसी की समय सीमा क्या है?',
+      'I would like to speak with a human support agent.':
+        'मैं एक मानव सहायता एजेंट से बात करना चाहूँगा।',
+      'Track my order': 'मेरा ऑर्डर ट्रैक करें',
+      'Request a return': 'वापसी का अनुरोध करें',
+      'Report a damaged product': 'क्षतिग्रस्त उत्पाद की रिपोर्ट करें',
+      'Request a human agent': 'मानव एजेंट से बात करें',
+    },
+    'en_mr': {
+      'Hi, I ordered the NovaSprint Pro shoes 6 days ago (Order #NC1021). The tracking hasn\'t moved in 4 days. Where is my order?':
+        'नमस्कार, मी 6 दिवसांपूर्वी NovaSprint Pro शूज (Order #NC1021) ऑर्डर केले होते. 4 दिवसांपासून ट्रॅकिंग पुढे गेलेले नाही. माझी ऑर्डर कुठे आहे?',
+      'Can you check the current tracking status?':
+        'तुम्ही सध्याची ट्रॅकिंग स्थिती तपासू शकता का?',
+      'What is your return and refund window?':
+        'तुमची परतावा आणि रीफंड कालावधी काय आहे?',
+      'I would like to speak with a human support agent.':
+        'मला मानवी सपोर्ट एजंटशी बोलायचे आहे.',
+      'Track my order': 'माझी ऑर्डर ट्रॅक करा',
+      'Request a return': 'परतावा विनंती करा',
+      'Report a damaged product': 'खराब उत्पादनाची तक्रार करा',
+      'Request a human agent': 'मानव एजंटशी बोला',
+    },
+    'hi_en': {
+      'नमस्ते, मैंने 6 दिन पहले NovaSprint Pro जूते (Order #NC1021) ऑर्डर किए थे।':
+        'Hello, I ordered the NovaSprint Pro shoes 6 days ago (Order #NC1021).',
+      'मेरा ऑर्डर कहाँ है?': 'Where is my order?',
+      'मेरी डिलीवरी में देरी क्यों हो रही है?': 'Why is my delivery getting delayed?',
+    },
+    'mr_en': {
+      'माझी ऑर्डर कुठे आहे?': 'Where is my order?',
+      'माझ्या डिलिव्हरीला उशीर का होत आहे?': 'Why is my delivery getting delayed?',
+    }
+  };
+
+  const pairKey = `${sourceLanguage === 'auto' ? 'en' : sourceLanguage}_${targetLanguage}`;
+  const translated = fallbackDict[pairKey]?.[trimmed] || trimmed;
+
+  return res.json({
+    success: true,
+    source: 'fallback',
+    originalText: text,
+    translatedText: translated,
+    targetLanguage,
+  });
+});
+
 export default router;

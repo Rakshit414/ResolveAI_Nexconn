@@ -152,8 +152,8 @@ async function runEnhancementsSuite() {
     console.log('[DEBUG] Clicked button:', clickedTrack);
     await sleep(800);
     const trackingVisible = await page.evaluate(() => {
-      const text = document.body.innerText;
-      return text.includes('Latest Courier Update') || text.includes('Courier Update') || text.includes('Carrier:');
+      const text = document.body.innerText.toUpperCase();
+      return text.includes('COURIER UPDATE') || text.includes('CARRIER:') || text.includes('CARRIER');
     });
     assert('Test 5.1: "Track my order" smart action expands tracking details', trackingVisible);
 

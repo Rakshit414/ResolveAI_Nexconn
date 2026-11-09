@@ -165,28 +165,68 @@ async function main() {
       await takeScreenshot(`agent_dashboard_copilot_open_${res.name}.png`);
     }
 
-    // Multilingual & CX Feature Highlights
-    console.log('\n--- Multilingual Support Customer Screenshots ---');
+    // =========================================================================
+    // NEW REQUIREMENTS: CUSTOMER IDENTITY & INITIAL EXPERIENCE GALLERY
+    // =========================================================================
+    console.log('\n--- Customer Identity & Initial Experience Gallery (1536x864) ---');
     await page.setViewport({ width: 1536, height: 864, deviceScaleFactor: 1 });
-    await page.goto(`${FRONTEND_URL}/customer`, { waitUntil: 'networkidle0' });
+
+    // 1. First-time customer opening the portal as Aarav
+    console.log('[Identity] 1. First-time customer opening as Aarav Sharma');
+    await page.goto(`${FRONTEND_URL}/customer?customer=cust_aarav&view=welcome`, { waitUntil: 'networkidle0' });
+    await sleep(1200);
+    await takeScreenshot('first_time_customer_aarav_1536x864.png');
+
+    // 2. First-time customer opening as Priya Mehta
+    console.log('[Identity] 2. First-time customer opening as Priya Mehta');
+    await page.goto(`${FRONTEND_URL}/customer?customer=cust_priya&view=welcome`, { waitUntil: 'networkidle0' });
+    await sleep(1200);
+    await takeScreenshot('first_time_customer_priya_1536x864.png');
+
+    // 3. First-time customer opening as Kabir Verma
+    console.log('[Identity] 3. First-time customer opening as Kabir Verma');
+    await page.goto(`${FRONTEND_URL}/customer?customer=cust_kabir&view=welcome`, { waitUntil: 'networkidle0' });
+    await sleep(1200);
+    await takeScreenshot('first_time_customer_kabir_1536x864.png');
+
+    // 4. Returning customer with an existing conversation
+    console.log('[Identity] 4. Returning customer with existing conversation');
+    await page.goto(`${FRONTEND_URL}/customer?customer=cust_aarav&view=chat`, { waitUntil: 'networkidle0' });
+    await sleep(1200);
+    await takeScreenshot('returning_customer_conversation_1536x864.png');
+
+    // 5. Welcome experience in English, Hindi, and Marathi
+    console.log('\n--- Multilingual Welcome Experience Screenshots ---');
+    await page.goto(`${FRONTEND_URL}/customer?customer=cust_aarav&view=welcome`, { waitUntil: 'networkidle0' });
     await sleep(1000);
+    await takeScreenshot('welcome_experience_english_1536x864.png');
 
     // Hindi
     await page.select('#customer-language-select', 'hi');
     await sleep(1000);
+    await takeScreenshot('welcome_experience_hindi_1536x864.png');
     await takeScreenshot('customer_portal_hindi_1536x864.png');
 
     // Marathi
     await page.select('#customer-language-select', 'mr');
     await sleep(1000);
+    await takeScreenshot('welcome_experience_marathi_1536x864.png');
     await takeScreenshot('customer_portal_marathi_1536x864.png');
 
     // Return to English
     await page.select('#customer-language-select', 'en');
     await sleep(1000);
 
-    // 7. Attachment Upload and Preview Screenshot
+    // 6. Customer Portal inside Split View
+    console.log('\n--- Customer Portal inside Split View ---');
+    await page.goto(`${FRONTEND_URL}/split`, { waitUntil: 'networkidle0' });
+    await sleep(1500);
+    await takeScreenshot('customer_portal_in_split_view_1536x864.png');
+
+    // Attachment Upload and Preview Screenshot
     console.log('\n--- Attachment Upload and Preview Screenshot ---');
+    await page.goto(`${FRONTEND_URL}/customer?customer=cust_aarav&view=chat`, { waitUntil: 'networkidle0' });
+    await sleep(1000);
     await page.evaluate(() => {
       // Trigger damage quick action and attach sample proof image
       const btns = Array.from(document.querySelectorAll('button'));

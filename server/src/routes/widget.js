@@ -5,6 +5,87 @@ import { query } from '../db/pool.js';
 const router = express.Router();
 
 /**
+ * GET /api/widget/config
+ * Retrieves validated brand theme and configuration for the embeddable widget.
+ */
+router.get('/config', async (req, res) => {
+  const brandId = req.query.brandId || req.query.brand || 'brand_novacart';
+  const requestOrigin = req.headers.origin || req.headers.referer || '';
+
+  try {
+    const brandRes = await query(`
+      SELECT id, name, slug, logo_url, support_identity, allowed_origins 
+      FROM brands 
+      WHERE id = $1 OR slug = $1
+    `, [brandId]);
+
+    if (brandRes.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Brand not found' });
+    }
+
+    const brand = brandRes.rows[0];
+
+    // Origin validation
+    const isLocalhost = requestOrigin.includes('localhost') || requestOrigin.includes('127.0.0.1');
+    if (!isLocalhost && brand.allowed_origins?.length > 0) {
+      const isAllowed = brand.allowed_origins.some(allowed => requestOrigin.startsWith(allowed));
+      if (!isAllowed) {
+        return res.status(403).json({ success: false, error: 'Origin not authorized for brand widget' });
+      }
+    }
+
+    // Load policies if available
+    let policies = [];
+    try {
+      const policiesRes = await query(`
+        SELECT topic, rule, action_guideline 
+        FROM brand_policies 
+        WHERE brand_id = $1 
+        ORDER BY priority_order ASC
+      `, [brand.id]);
+      policies = policiesRes.rows;
+    } catch (e) {
+      // Fallback
+    }
+
+    const theme = {
+      primaryColor: '#7CFF00',
+      primaryTextColor: '#090909',
+      accentColor: '#10B981',
+      tagline: 'Your Everyday Premium Marketplace',
+      welcomeMessage: 'Hello! Welcome to NovaCart Support. How can we help you with your order today?',
+      defaultLanguage: 'en',
+      supportedLanguages: ['en', 'hi', 'mr'],
+      launcherPosition: 'bottom-right',
+      badgeText: '24/7 AI Support'
+    };
+
+    return res.json({
+      success: true,
+      brand: {
+        id: brand.id,
+        name: brand.name,
+        slug: brand.slug,
+        logoUrl: brand.logo_url,
+        supportIdentity: brand.support_identity
+      },
+      theme,
+      policies,
+      suggestedActions: [
+        { id: 'track_order', label: 'Track Order', icon: 'package' },
+        { id: 'return_request', label: 'Return / Refund', icon: 'refresh-cw' },
+        { id: 'damaged_product', label: 'Damaged / Wrong Item', icon: 'alert-triangle' },
+        { id: 'ask_question', label: 'Ask Question', icon: 'help-circle' },
+        { id: 'connect_human', label: 'Talk to Human Agent', icon: 'user' }
+      ]
+    });
+  } catch (err) {
+    console.error('[Widget Config Error]:', err.message);
+    return res.status(500).json({ success: false, error: 'Failed to load widget configuration' });
+  }
+});
+
+/**
  * POST /api/widget/bootstrap
  * Securely authenticates an embeddable customer support widget session.
  */

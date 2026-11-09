@@ -50,6 +50,12 @@ app.use('/api/webhooks', webhooksRouter);
 app.use('/api/widget', widgetRouter);
 app.use('/api/attachments', attachmentsRouter);
 
+// Standalone Embed Widget Loader Script for Host Integration
+app.get('/widget.js', (req, res) => {
+  res.setHeader('Content-Type', 'application/javascript');
+  res.sendFile(path.resolve(__dirname, '../public/widget.js'));
+});
+
 // Health check endpoint
 app.get('/api/health', async (req, res) => {
   const dbHealth = await healthCheck().catch(err => ({ healthy: false, error: err.message }));

@@ -7,7 +7,8 @@ import {
   BookOpen, 
   ChevronDown,
   MessageSquare,
-  Sparkles
+  Sparkles,
+  ShoppingBag
 } from 'lucide-react';
 import { DEMO_CUSTOMERS } from '../data/demoData';
 
@@ -20,8 +21,8 @@ export default function Navbar({
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
   const isActive = (path) => {
-    if (path === '/customer') {
-      return location.pathname === '/customer' || location.pathname === '/';
+    if (path === '/store') {
+      return location.pathname === '/store' || location.pathname === '/';
     }
     return location.pathname === path;
   };
@@ -48,6 +49,18 @@ export default function Navbar({
 
           {/* Minimal Navigation Pills with ample breathing space */}
           <nav className="flex items-center space-x-2 pl-4 border-l border-[#1C1C1C]">
+            <Link
+              to="/store"
+              className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                isActive('/store')
+                  ? 'bg-[#7CFF00] text-[#090909] shadow-neon-sm font-bold'
+                  : 'text-[#8A8A8A] hover:text-[#FFFFFF] hover:bg-[#161616]'
+              }`}
+            >
+              <ShoppingBag className="w-3.5 h-3.5" />
+              <span>Storefront</span>
+            </Link>
+
             <Link
               to="/customer"
               className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${

@@ -470,6 +470,10 @@ class NexconnManager {
     return [...this.channelHistory.get(channelId)];
   }
 
+  getChannelHistory(channelId) {
+    return this.getChannelMessages(channelId);
+  }
+
   /**
    * Dispatch a message to subscribers of ONLY the specified channel.
    * Guarantees that no message leaks into any other channel!
@@ -533,6 +537,10 @@ class NexconnManager {
         }
       }
     };
+  }
+
+  subscribeToChannel(channelId, callback) {
+    return this.subscribe(channelId, callback);
   }
 
   /**

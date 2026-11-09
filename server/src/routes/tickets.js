@@ -1,8 +1,11 @@
 import express from 'express';
+import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { DEMO_CUSTOMERS } from '../data/demoData.js';
+import { storageService } from '../services/storageService.js';
+import { requireAgentAuth } from '../middleware/agentAuth.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -82,8 +85,31 @@ const VALID_PRIORITIES = ['Critical', 'High', 'Medium', 'Low'];
 const VALID_CATEGORIES = ['Delivery Delay', 'Refund Request', 'Wrong Product', 'Cancellation', 'General Inquiry', 'Damaged Product', 'Payment Issue', 'Other'];
 
 // GET /api/tickets - List all tickets with optional filtering and customer scoping
-router.get('/', (req, res) => {
-  const { priority, status, category, customerId } = req.query;
+router.get('/', async (req, res) => {
+  const { priority, status, category, customerId, brandId = 'brand_novacart' } = req.query;
+
+  if (storageService.isPostgresMode) {
+    try {
+      let dbTickets = await storageService.getTickets({ brandId, status: status !== 'All' ? status : null });
+      if (customerId) {
+        dbTickets = dbTickets.filter(t => t.customerId === customerId || t.customer?.id === customerId);
+      }
+      if (priority && priority !== 'All') {
+        dbTickets = dbTickets.filter(t => t.priority.toLowerCase() === priority.toLowerCase());
+      }
+      if (category && category !== 'All') {
+        dbTickets = dbTickets.filter(t => t.category.toLowerCase() === category.toLowerCase());
+      }
+      return res.json({
+        success: true,
+        count: dbTickets.length,
+        tickets: dbTickets
+      });
+    } catch (err) {
+      console.warn('[Tickets] Storage query error, using local fallback:', err.message);
+    }
+  }
+
   let filtered = [...tickets];
 
   if (customerId) {
@@ -113,14 +139,63 @@ router.get('/', (req, res) => {
   });
 });
 
+// POST /api/tickets - Ingest or dynamically create a ticket with request-level idempotency
+router.post('/', async (req, res) => {
+  const idempotencyKey = req.headers['idempotency-key'] || req.body.idempotencyKey || null;
+  const { brandId = 'brand_novacart', customer, orderNumber, category = 'General Inquiry', priority = 'Medium', sentiment = 'Neutral', initialMessage = '' } = req.body;
+
+  // Compute canonical request hash
+  const requestPayload = { brandId, customerId: customer?.id, orderNumber, category, priority, initialMessage };
+  const requestHash = crypto.createHash('sha256').update(JSON.stringify(requestPayload)).digest('hex');
+
+  try {
+    const result = await storageService.createTicket({
+      brandId,
+      customer,
+      orderNumber,
+      category,
+      priority,
+      sentiment,
+      initialMessage,
+      idempotencyKey,
+      requestHash
+    });
+
+    if (result.cached) {
+      res.setHeader('X-Cache-Lookup', 'HIT-IDEMPOTENT');
+    }
+    return res.status(result.statusCode).json(result.data);
+  } catch (err) {
+    if (err.statusCode === 409) {
+      return res.status(409).json({ error: err.message });
+    }
+    console.error('[Create Ticket Error]:', err.message);
+    return res.status(500).json({ error: 'Failed to create ticket.' });
+  }
+});
+
 // GET /api/tickets/:id - Get specific ticket with optional customer ownership verification
-router.get('/:id', (req, res) => {
+router.get('/:id', async (req, res) => {
+  const { customerId, brandId = 'brand_novacart' } = req.query;
+
+  if (storageService.isPostgresMode) {
+    try {
+      const ticket = await storageService.getTicketById(req.params.id, brandId);
+      if (!ticket) return res.status(404).json({ success: false, error: 'Ticket not found' });
+      if (customerId && ticket.customerId !== customerId && ticket.customer?.id !== customerId) {
+        return res.status(403).json({ success: false, error: 'Access denied: ticket does not belong to specified customer' });
+      }
+      return res.json({ success: true, ticket });
+    } catch (err) {
+      console.warn('[Tickets] Query error:', err.message);
+    }
+  }
+
   const ticket = tickets.find(t => t.id === req.params.id || t.orderId === req.params.id);
   if (!ticket) {
     return res.status(404).json({ success: false, error: 'Ticket not found' });
   }
 
-  const { customerId } = req.query;
   if (customerId && ticket.customerId !== customerId && ticket.customer?.id !== customerId) {
     return res.status(403).json({ success: false, error: 'Access denied: ticket does not belong to specified customer' });
   }
@@ -130,11 +205,6 @@ router.get('/:id', (req, res) => {
 
 // PATCH /api/tickets/:id - Update ticket status, priority, or category with strict validation
 router.patch('/:id', async (req, res) => {
-  const index = tickets.findIndex(t => t.id === req.params.id || t.orderId === req.params.id);
-  if (index === -1) {
-    return res.status(404).json({ success: false, error: 'Ticket not found' });
-  }
-
   const { status, priority, category, summary, suggestedReply, pendingAction } = req.body;
 
   if (status !== undefined && !VALID_STATUSES.includes(status)) {
@@ -156,6 +226,28 @@ router.patch('/:id', async (req, res) => {
       success: false, 
       error: `Invalid category "${category}". Allowed values: ${VALID_CATEGORIES.join(', ')}` 
     });
+  }
+
+  const updates = {};
+  if (status !== undefined) updates.status = status;
+  if (priority !== undefined) updates.priority = priority;
+  if (category !== undefined) updates.category = category;
+  if (summary !== undefined) updates.summary = summary;
+  if (suggestedReply !== undefined) updates.suggestedReply = suggestedReply;
+  if (pendingAction !== undefined) updates.pendingAction = pendingAction;
+
+  if (storageService.isPostgresMode) {
+    try {
+      const updated = await storageService.updateTicket(req.params.id, updates);
+      if (updated) return res.json({ success: true, ticket: updated });
+    } catch (err) {
+      console.warn('[Tickets] Storage update error:', err.message);
+    }
+  }
+
+  const index = tickets.findIndex(t => t.id === req.params.id || t.orderId === req.params.id);
+  if (index === -1) {
+    return res.status(404).json({ success: false, error: 'Ticket not found' });
   }
 
   if (status !== undefined) {
@@ -186,6 +278,10 @@ router.post('/:id/human-handoff', async (req, res) => {
   tickets[index].lastUpdated = new Date().toISOString();
   await saveTicketsAtomic(tickets);
 
+  if (storageService.isPostgresMode) {
+    await storageService.updateTicket(req.params.id, { status: 'Human Requested', human_requested: true }).catch(() => {});
+  }
+
   res.json({
     success: true,
     message: 'Human agent assistance requested successfully',
@@ -205,6 +301,14 @@ router.post('/:id/take-over', async (req, res) => {
   tickets[index].lastUpdated = new Date().toISOString();
   await saveTicketsAtomic(tickets);
 
+  if (storageService.isPostgresMode) {
+    await storageService.updateTicket(req.params.id, { 
+      status: 'Human Agent Active', 
+      human_requested: false,
+      assigned_agent_id: req.agent?.id || 'user_sarah_lin'
+    }).catch(() => {});
+  }
+
   res.json({
     success: true,
     message: 'Agent took over ticket successfully',
@@ -223,6 +327,10 @@ router.post('/:id/resolve', async (req, res) => {
   tickets[index].status = 'Resolved';
   tickets[index].lastUpdated = new Date().toISOString();
   await saveTicketsAtomic(tickets);
+
+  if (storageService.isPostgresMode) {
+    await storageService.updateTicket(req.params.id, { status: 'Resolved', human_requested: false }).catch(() => {});
+  }
 
   res.json({
     success: true,
@@ -264,7 +372,6 @@ router.post('/:id/feedback', async (req, res) => {
 
 // POST /api/tickets/reset - Reset tickets to initial seed state (Protected Demo/Dev endpoint)
 router.post('/reset', async (req, res) => {
-  // Security protection: Prevent unauthorized resets in strict production mode unless demo override is configured
   if (process.env.NODE_ENV === 'production' && !process.env.ALLOW_DEMO_RESET) {
     return res.status(403).json({
       success: false,

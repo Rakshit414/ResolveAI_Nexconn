@@ -13,11 +13,14 @@
     "@google/generative-ai": "^0.24.0",
     "@supabase/supabase-js": "^2.49.1",
     "axios": "^1.8.1",
+    "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
-    "express": "^4.21.2"
+    "express": "^4.21.2",
+    "pg": "^8.23.1"
   },
   "devDependencies": {
-    "nodemon": "^3.1.9"
+    "nodemon": "^3.1.9",
+    "pg-mem": "^3.0.14"
   }
 }

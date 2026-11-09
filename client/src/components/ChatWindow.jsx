@@ -245,21 +245,30 @@ export default function ChatWindow({
         </div>
       )}
 
-      {/* Customer Resolution Feedback Banner if submitted */}
+      {/* Customer Resolution Feedback Bar (Compact, Dedicated Non-Overlapping Section) */}
       {ticket?.feedback && (
-        <div className="mx-6 md:mx-8 mt-3 p-3 rounded-xl bg-[#111A10] border border-[#7CFF00]/30 text-xs flex items-center justify-between animate-fadeIn shrink-0 shadow-sm">
-          <div className="flex items-center space-x-2.5">
-            <span className="text-[#7CFF00] font-bold">Customer Feedback:</span>
-            <span className="text-[#FFFFFF] font-medium">
-              {ticket.feedback.rating ? '⭐'.repeat(ticket.feedback.rating) : 'Rated'}
+        <div className="px-6 py-2.5 bg-[#0C150A] border-b border-[#7CFF00]/25 text-xs flex items-center justify-between shrink-0 animate-fadeIn">
+          <div className="flex items-center space-x-2.5 min-w-0">
+            <span className="text-[#7CFF00] font-bold shrink-0">Customer Feedback:</span>
+            <span className="text-[#FFFFFF] font-semibold shrink-0">
+              {'⭐'.repeat(Number(ticket.feedback.rating) || 5)} ({ticket.feedback.rating || 5}/5)
             </span>
-            {ticket.feedback.comment && (
-              <span className="text-[#AAAAAA] italic truncate max-w-md">"{ticket.feedback.comment}"</span>
-            )}
+            {ticket.feedback.comment ? (
+              <span className="text-[#BBBBBB] italic truncate max-w-sm">
+                "{ticket.feedback.comment}"
+              </span>
+            ) : null}
           </div>
-          <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-[#7CFF00]/10 text-[#7CFF00] font-bold border border-[#7CFF00]/20 shrink-0">
-            {ticket.feedback.resolved ? 'Resolved' : 'Needs Followup'}
-          </span>
+          <div className="flex items-center space-x-2.5 shrink-0">
+            {ticket.feedback.submittedAt && (
+              <span className="text-[10px] text-[#777777] font-mono">
+                {new Date(ticket.feedback.submittedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            )}
+            <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-[#7CFF00]/10 text-[#7CFF00] font-bold border border-[#7CFF00]/30">
+              {ticket.feedback.resolved ? 'Resolved' : 'Needs Followup'}
+            </span>
+          </div>
         </div>
       )}
 

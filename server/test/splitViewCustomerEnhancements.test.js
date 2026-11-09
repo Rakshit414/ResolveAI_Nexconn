@@ -200,14 +200,76 @@ async function runEnhancementsSuite() {
     });
     assert('Test 6.3: Customer sees "Thank you for your feedback!" confirmation', thankYouVisible);
 
-    // 5. Verify agent dashboard displays Customer Feedback Banner
+    // 5. Verify agent dashboard displays Customer Feedback Banner with submission time & rating
     const agentSeesFeedback = await page.evaluate(() => {
-      return document.body.innerText.includes('Customer Feedback:') || document.body.innerText.includes('Agent was quick and courteous');
+      return document.body.innerText.includes('Customer Feedback:') && 
+             (document.body.innerText.includes('5/5') || document.body.innerText.includes('⭐⭐⭐⭐⭐'));
     });
     assert('Test 6.4: Agent dashboard displays customer feedback badge with rating and comment', agentSeesFeedback);
 
+    console.log('\n--- TEST 7: Full Ticket Reopening Lifecycle ---');
+    // Sequence: Resolved -> Customer Reopens -> Human Requested -> Agent Takes Over -> Resolved
+    
+    // 1. Customer sends follow-up message to reopen resolved ticket
+    const customerInput = await page.$('.w-full.lg\\:w-\\[42\\%\\] form input, form input[placeholder*="message"]');
+    if (customerInput) {
+      await customerInput.type('I have an additional question about my warranty.');
+      await sleep(300);
+      const customerSubmit = await page.$('.w-full.lg\\:w-\\[42\\%\\] form button[type="submit"]');
+      if (customerSubmit) {
+        await customerSubmit.click();
+      } else {
+        await page.keyboard.press('Enter');
+      }
+    }
+    await sleep(2000);
+
+    const ticketReopened = await page.evaluate(() => {
+      const hasAIBadge = Boolean(document.querySelector('#customer-status-badge-ai'));
+      const text = document.body.innerText;
+      return hasAIBadge || text.includes('AI Handling');
+    });
+    assert('Test 7.1: Customer message transitions ticket from Resolved to AI Handling', ticketReopened);
+
+    // 2. Customer requests human support
+    await page.evaluate(() => {
+      const reqBtn = document.querySelector('#btn-request-human');
+      if (reqBtn) reqBtn.click();
+    });
+    await sleep(1500);
+
+    const handoffActive = await page.evaluate(() => {
+      return document.body.innerText.includes('Human Requested') && document.body.innerText.includes('Take Over');
+    });
+    assert('Test 7.2: Customer request transitions ticket to Human Requested on both panes', handoffActive);
+
+    // 3. Agent takes over
+    await page.evaluate(() => {
+      const takeOverBtn = document.querySelector('#btn-takeover-ticket');
+      if (takeOverBtn) takeOverBtn.click();
+    });
+    await sleep(1500);
+
+    const agentActiveState = await page.evaluate(() => {
+      return document.body.innerText.includes('Human Agent Active') || document.body.innerText.includes('Sarah Lin Active');
+    });
+    assert('Test 7.3: Agent Take Over transitions ticket to Human Agent Active on both panes', agentActiveState);
+
+    // 4. Agent resolves ticket again
+    await page.evaluate(() => {
+      const resolveBtn = document.querySelector('#btn-resolve-ticket');
+      if (resolveBtn) resolveBtn.click();
+    });
+    await sleep(1500);
+
+    const reResolvedState = await page.evaluate(() => {
+      return document.body.innerText.includes('Resolved');
+    });
+    assert('Test 7.4: Agent Resolves ticket completes the full lifecycle', reResolvedState);
+
     console.log('\n================================================================');
-    console.log('ALL SPLIT VIEW & CUSTOMER ENHANCEMENT TESTS PASSED! (13/13)');
+    console.log('ALL SPLIT VIEW, CX & LIFECYCLE TESTS PASSED! (17/17)');
+    console.log('================================================================');
     console.log('================================================================');
 
   } finally {

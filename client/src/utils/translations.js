@@ -44,6 +44,10 @@ export const TRANSLATIONS = {
     systemHandoff: "Customer requested human agent assistance.",
     systemResolved: "Ticket marked as resolved. Thank you for contacting NovaCart Support!",
     photoAttached: "Evidence photograph attached",
+    viewTranslation: "Translate to English",
+    originalMessage: "Original Message:",
+    translationLabel: "English Translation:",
+    translating: "Translating...",
   },
   
   hi: {
@@ -88,6 +92,10 @@ export const TRANSLATIONS = {
     systemHandoff: "ग्राहक ने मानव एजेंट सहायता का अनुरोध किया।",
     systemResolved: "टिकट का समाधान हो गया। नोवाकार्ट सपोर्ट से संपर्क करने के लिए धन्यवाद!",
     photoAttached: "प्रमाण फ़ोटो संलग्न की गई",
+    viewTranslation: "हिन्दी में अनुवाद देखें",
+    originalMessage: "मूल संदेश:",
+    translationLabel: "हिन्दी अनुवाद:",
+    translating: "अनुवाद हो रहा है...",
   },
   
   mr: {
@@ -100,12 +108,12 @@ export const TRANSLATIONS = {
     statusAgentActive: "सारा लिन सक्रिय",
     statusHumanRequested: "मानवी सहाय्य मागितले",
     statusAIHandling: "एआय हाताळणी",
-    btnRequestHuman: "मानव एजंटशी बोला",
+    btnRequestHuman: "मानव एजेंट से बात करें",
     quickAskPrefix: "त्वरित कृती:",
     quickTrackOrder: "ऑर्डर ट्रॅक करा",
     quickReturn: "परतावा विनंती करा",
     quickDamage: "खराब उत्पादनाची तक्रार करा",
-    quickHuman: "मानव एजंटशी बोला",
+    quickHuman: "मानव एजेंट से बात करें",
     carrier: "कुरिअर",
     deliveryStatus: "डिलिव्हरी स्थिती",
     latestUpdate: "नवीनतम कुरिअर अपडेट",
@@ -132,6 +140,10 @@ export const TRANSLATIONS = {
     systemHandoff: "ग्राहकाने मानवी एजंट सहाय्याची विनंती केली.",
     systemResolved: "तिकिटाचे निवारण झाले. नोव्हाकार्ट सपोर्टशी संपर्क साधल्याबद्दल धन्यवाद!",
     photoAttached: "पुराव्याचा फोटो जोडला",
+    viewTranslation: "मराठीमध्ये भाषांतर पहा",
+    originalMessage: "मूळ संदेश:",
+    translationLabel: "मराठी भाषांतर:",
+    translating: "भाषांतर होत आहे...",
   }
 };
 

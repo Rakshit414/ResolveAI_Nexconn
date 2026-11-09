@@ -139,6 +139,11 @@ export default function AgentDashboard({
           }
         }
 
+        // Reopening lifecycle: customer sending a message on a resolved ticket reopens it to active handling
+        if (!s && newMsg.senderRole === 'customer' && isLive && (t.status === 'Resolved' || newMsg.metadata?.isReopened)) {
+          s = 'AI Handling';
+        }
+
         if (newMsg.metadata?.feedback) {
           const fb = newMsg.metadata.feedback;
           nexconnService.setTicketFeedback(t.id, fb);

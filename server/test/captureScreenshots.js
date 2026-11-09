@@ -185,6 +185,43 @@ async function main() {
     await page.select('#customer-language-select', 'en');
     await sleep(1000);
 
+    // 7. Attachment Upload and Preview Screenshot
+    console.log('\n--- Attachment Upload and Preview Screenshot ---');
+    await page.evaluate(() => {
+      // Trigger damage quick action and attach sample proof image
+      const btns = Array.from(document.querySelectorAll('button'));
+      const damageBtn = btns.find(b => b.textContent.includes('Report damaged product') || b.textContent.includes('खराब उत्पादनाची तक्रार') || b.textContent.includes('क्षतिग्रस्त उत्पाद'));
+      if (damageBtn) damageBtn.click();
+    });
+    // Set attachment state via file input
+    const fileInput = await page.$('input[type="file"]');
+    if (fileInput) {
+      // Create a small test image in memory and upload
+      const testImgPath = path.join(ROOT_DIR, 'test_sample_damage.png');
+      const pngBuffer = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAAUSURBVGhD7cEBDQAAAMKg909tDwcUAAAcO8k2AAEPB6vQAAAAAElFTkSuQmCC', 'base64');
+      fs.writeFileSync(testImgPath, pngBuffer);
+      await fileInput.uploadFile(testImgPath);
+      await sleep(1000);
+      try { fs.unlinkSync(testImgPath); } catch (e) {}
+    }
+    await takeScreenshot('customer_portal_attachment_preview_1536x864.png');
+
+    // 8. Agent Dashboard Showing Customer Feedback
+    console.log('\n--- Agent Dashboard Showing Customer Feedback ---');
+    try {
+      await axios.post(`${BACKEND_URL}/api/tickets/tkt_1021/feedback`, {
+        resolved: true,
+        rating: 5,
+        comment: 'Resolved within minutes! Exceptional customer care.',
+        submittedAt: new Date().toISOString()
+      });
+    } catch (e) {
+      console.warn('Feedback seed note:', e.message);
+    }
+    await page.goto(`${FRONTEND_URL}/agent`, { waitUntil: 'networkidle0' });
+    await sleep(1500);
+    await takeScreenshot('agent_dashboard_with_feedback_1536x864.png');
+
     // Responsive Mobile & Tablet Verification
     console.log('\n--- Responsive Tablet & Mobile Verification ---');
     await page.setViewport({ width: 768, height: 1024, deviceScaleFactor: 1 });

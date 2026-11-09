@@ -487,13 +487,15 @@ class NexconnManager {
       this.seenMessageIds.add(msgId);
     }
 
-    // Append to isolated channel history
-    if (!this.channelHistory.has(channelId)) {
-      this.channelHistory.set(channelId, []);
+    // Append to isolated channel history only if it represents a chat bubble (has text or attachment)
+    if (!message.isMetadataOnly && (message.text || message.attachment)) {
+      if (!this.channelHistory.has(channelId)) {
+        this.channelHistory.set(channelId, []);
+      }
+      const currentList = this.channelHistory.get(channelId);
+      currentList.push(message);
+      this.saveHistoryToStorage();
     }
-    const currentList = this.channelHistory.get(channelId);
-    currentList.push(message);
-    this.saveHistoryToStorage();
 
     // Call ONLY callbacks subscribed to this exact channelId
     const callbacks = this.channelSubscribers.get(channelId);
@@ -619,6 +621,26 @@ class NexconnManager {
         this.inFlightSends.delete(flightKey);
       }, 400);
     }
+  }
+
+  /**
+   * Broadcast structured metadata event without adding a chat message to history
+   */
+  broadcastMetadata({ channelId, metadata = {} }) {
+    if (!channelId || !metadata) return null;
+    const eventPayload = {
+      id: `meta_${channelId}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      channelId,
+      senderId: this.currentUser?.id || 'customer',
+      senderName: this.currentUser?.name || 'Customer',
+      senderRole: this.currentUser?.role ? 'agent' : 'customer',
+      text: '',
+      isMetadataOnly: true,
+      timestamp: new Date().toISOString(),
+      metadata,
+    };
+    this.dispatchToChannel(channelId, eventPayload);
+    return eventPayload;
   }
 
   /**

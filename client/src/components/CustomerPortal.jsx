@@ -13,7 +13,7 @@ import {
   Star
 } from 'lucide-react';
 import { DEMO_CUSTOMERS } from '../data/demoData';
-import { requestHumanAssistance, getTicket, submitResolutionFeedback } from '../services/api';
+import { requestHumanAssistance, getTicket, updateTicket, submitResolutionFeedback, translateText } from '../services/api';
 import nexconnService from '../services/nexconnService';
 import { TRANSLATIONS, SUPPORTED_LANGUAGES } from '../utils/translations';
 
@@ -33,6 +33,8 @@ export default function CustomerPortal({
   // Multilingual Support
   const [currentLang, setCurrentLang] = useState('en');
   const t = TRANSLATIONS[currentLang] || TRANSLATIONS.en;
+  const [agentTranslationsMap, setAgentTranslationsMap] = useState({});
+  const [translatingAgentIds, setTranslatingAgentIds] = useState(new Set());
 
   // Attachment Support
   const [attachment, setAttachment] = useState(null);
@@ -104,12 +106,15 @@ export default function CustomerPortal({
 
     // 3. Subscribe ONLY to this customer's persistent channel
     const unsubscribe = nexconnService.subscribe(channelId, (newMsg) => {
-      setMessages((prev) => {
-        if (prev.some((m) => m.id === newMsg.id || (m.messageId && m.messageId === newMsg.messageId))) {
-          return prev;
-        }
-        return [...prev, newMsg];
-      });
+      // If it's a real chat message (not metadata-only), add to message stream
+      if (!newMsg.isMetadataOnly && (newMsg.text || newMsg.attachment)) {
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === newMsg.id || (m.messageId && m.messageId === newMsg.messageId))) {
+            return prev;
+          }
+          return [...prev, newMsg];
+        });
+      }
 
       const msgTime = newMsg.timestamp ? new Date(newMsg.timestamp).getTime() : Date.now();
       const isLive = (Date.now() - msgTime) < 30000;
@@ -169,6 +174,33 @@ export default function CustomerPortal({
     e.target.value = '';
   };
 
+  // Translate agent responses for multilingual customers
+  const handleTranslateAgentMessage = async (msgId, text, targetLang) => {
+    if (agentTranslationsMap[msgId] || translatingAgentIds.has(msgId)) return;
+    setTranslatingAgentIds((prev) => new Set(prev).add(msgId));
+    try {
+      const res = await translateText({
+        text,
+        targetLanguage: targetLang,
+        sourceLanguage: 'en',
+      });
+      if (res?.translatedText) {
+        setAgentTranslationsMap((prev) => ({
+          ...prev,
+          [msgId]: res.translatedText,
+        }));
+      }
+    } catch (err) {
+      console.warn('Customer translation error:', err);
+    } finally {
+      setTranslatingAgentIds((prev) => {
+        const next = new Set(prev);
+        next.delete(msgId);
+        return next;
+      });
+    }
+  };
+
   const handleSendMessage = async (e) => {
     e?.preventDefault();
     if ((!inputText.trim() && !attachment) || isSending) return;
@@ -176,6 +208,21 @@ export default function CustomerPortal({
     const textToSend = inputText.trim();
     const channelId = customer.channelId || `channel_${customer.order.orderId}`;
     const currentAttachment = attachment;
+    const ticketId = customer.ticket?.id;
+
+    // Explicit ticket reopening lifecycle: If ticket was Resolved, customer message transitions it back to active handling
+    const wasResolved = ticketStatus === 'Resolved';
+    const newStatus = wasResolved ? 'AI Handling' : ticketStatus;
+
+    if (wasResolved) {
+      setTicketStatus('AI Handling');
+      setHumanRequested(false);
+      setFeedbackSubmitted(false);
+      if (ticketId) {
+        nexconnService.setTicketStatus(ticketId, 'AI Handling');
+        updateTicket(ticketId, { status: 'AI Handling' }).catch(console.warn);
+      }
+    }
 
     setInputText('');
     setAttachment(null);
@@ -189,8 +236,10 @@ export default function CustomerPortal({
         attachment: currentAttachment,
         metadata: {
           orderId: customer.order.orderId,
-          ticketId: customer.ticket?.id,
+          ticketId,
           language: currentLang,
+          status: newStatus,
+          isReopened: wasResolved,
         },
       });
 
@@ -283,7 +332,7 @@ export default function CustomerPortal({
     }
   };
 
-  // Resolution Feedback Submission
+  // Resolution Feedback Submission: Stored strictly as structured ticket metadata without creating duplicate chat messages
   const handleSubmitFeedback = async () => {
     const ticketId = customer?.ticket?.id;
     if (!ticketId || isSubmittingFeedback) return;
@@ -293,17 +342,17 @@ export default function CustomerPortal({
       resolved: feedbackResolved,
       rating: feedbackRating,
       comment: feedbackComment.trim(),
+      submittedAt: new Date().toISOString(),
     };
 
     try {
       await submitResolutionFeedback(ticketId, feedbackPayload).catch(console.warn);
       nexconnService.setTicketFeedback(ticketId, feedbackPayload);
 
+      // Broadcast metadata event without polluting conversation history with a duplicate chat message
       const channelId = customer.channelId || `channel_${customer.order.orderId}`;
-      await nexconnService.sendMessage({
-        targetUserId: 'agent_sarah',
+      nexconnService.broadcastMetadata({
         channelId,
-        text: `[Resolution Feedback] Rating: ${feedbackRating}/5 · "${feedbackComment.trim() || 'No comment'}"`,
         metadata: {
           ticketId,
           feedback: feedbackPayload,
@@ -357,27 +406,26 @@ export default function CustomerPortal({
   return (
     <div className="flex flex-col h-full bg-[#0A0A0A] overflow-hidden relative">
       {/* Consolidated Single Header */}
-      <div className="px-6 py-4 bg-[#0D0D0D] border-b border-[#1A1A1A] shrink-0 space-y-3">
-        {/* Top Row: Brand, Language Selector & Persona Switcher */}
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center space-x-3 min-w-0">
+      <div className="px-5 py-3.5 bg-[#0D0D0D] border-b border-[#1A1A1A] shrink-0 space-y-2.5">
+        {/* Top Row: Brand & Cohesive Control Toolbar */}
+        <div className="flex items-center justify-between gap-3">
+          {/* NovaCart Branding (Clean single-line brand and status indicator) */}
+          <div className="flex items-center space-x-2.5 shrink-0">
             <div className="w-8 h-8 rounded-xl bg-[#161616] border border-[#262626] flex items-center justify-center text-[#7CFF00] shrink-0 shadow-sm">
               <ShoppingBag className="w-4 h-4" />
             </div>
-            <div className="min-w-0">
-              <div className="flex items-center space-x-2">
-                <span className="font-bold text-sm text-[#FFFFFF] tracking-tight">{t.brandName}</span>
-                <span className="px-2 py-0.5 rounded text-[10px] font-semibold text-[#8A8A8A] bg-[#161616] border border-[#222222] hidden sm:inline">
-                  {t.customerExp}
-                </span>
-                <div className="hidden md:flex items-center space-x-1.5 px-2 py-0.5 rounded-full bg-[#121A10] border border-[#7CFF00]/20 text-[10px] text-[#7CFF00] font-semibold">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#7CFF00] shadow-neon-sm" />
-                  <span>{t.connectionLive}</span>
-                </div>
+            <div className="flex items-center space-x-2">
+              <span className="font-bold text-sm text-[#FFFFFF] tracking-tight whitespace-nowrap">
+                {t.brandName}
+              </span>
+              <div className="hidden sm:flex items-center space-x-1.5 px-2 py-0.5 rounded-full bg-[#121A10] border border-[#7CFF00]/20 text-[10px] text-[#7CFF00] font-semibold whitespace-nowrap">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#7CFF00] shadow-neon-sm" />
+                <span>{t.connectionLive}</span>
               </div>
             </div>
           </div>
 
+          {/* Grouped Secondary Controls: Language + Transcript + Persona Switcher */}
           <div className="flex items-center space-x-2 shrink-0">
             {/* Language Selector Dropdown */}
             <div className="flex items-center space-x-1.5 bg-[#141414] px-2.5 py-1 rounded-xl border border-[#222222] text-xs">
@@ -400,19 +448,19 @@ export default function CustomerPortal({
             {/* Transcript Download Button */}
             <button
               onClick={handleDownloadTranscript}
-              className="p-1.5 rounded-xl bg-[#141414] border border-[#222222] text-[#8A8A8A] hover:text-[#FFFFFF] hover:border-[#7CFF00]/40 transition-colors"
+              className="p-1.5 rounded-xl bg-[#141414] border border-[#222222] text-[#8A8A8A] hover:text-[#FFFFFF] hover:border-[#7CFF00]/40 transition-colors shrink-0"
               title={t.downloadTranscript}
             >
               <Download className="w-3.5 h-3.5 text-[#7CFF00]" />
             </button>
 
             {/* Persona Switcher Tabs */}
-            <div className="flex items-center space-x-1 bg-[#141414] p-1 rounded-xl border border-[#222222]">
+            <div className="flex items-center space-x-1 bg-[#141414] p-1 rounded-xl border border-[#222222] shrink-0">
               {DEMO_CUSTOMERS.map((c) => (
                 <button
                   key={c.id}
                   onClick={() => onSelectCustomer(c)}
-                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
                     customer?.id === c.id
                       ? 'bg-[#7CFF00] text-[#090909] shadow-neon-sm font-bold'
                       : 'text-[#8A8A8A] hover:text-[#FFFFFF]'
@@ -426,14 +474,14 @@ export default function CustomerPortal({
           </div>
         </div>
 
-        {/* Integrated Order Context Strip with Product Thumbnail & Canonical Status */}
-        <div className="flex items-center justify-between pt-2 border-t border-[#161616] text-xs">
-          <div className="flex items-center space-x-3 min-w-0">
+        {/* Dedicated Order Context Row with Product Thumbnail & Canonical Status */}
+        <div className="flex items-center justify-between pt-2 border-t border-[#181818] text-xs">
+          <div className="flex items-center space-x-2.5 min-w-0">
             {(customer?.order?.productThumbnail || customer?.order?.image) ? (
               <img
                 src={customer.order.productThumbnail || customer.order.image}
                 alt={customer.order.product}
-                className="w-8 h-8 rounded-lg object-cover border border-[#262626] shrink-0"
+                className="w-7 h-7 rounded-lg object-cover border border-[#262626] shrink-0"
               />
             ) : null}
 
@@ -442,7 +490,7 @@ export default function CustomerPortal({
                 #{customer?.order?.orderId}
               </span>
               <span className="text-[#333333]">·</span>
-              <span className="text-[#CCCCCC] font-medium text-xs truncate max-w-[140px] sm:max-w-none">
+              <span className="text-[#CCCCCC] font-medium text-xs truncate max-w-[140px] sm:max-w-xs">
                 {customer?.order?.product}
               </span>
               <span className="text-[#333333]">·</span>
@@ -507,6 +555,7 @@ export default function CustomerPortal({
       <div id="customer-chat-messages" className="flex-1 overflow-y-auto px-6 lg:px-8 py-6 space-y-6 bg-[#090909]">
         {messages.map((msg) => {
           const isMe = msg.senderRole === 'customer' || msg.senderId === customer?.id;
+          const isAgent = msg.senderRole === 'agent' || msg.senderId === 'agent_sarah';
           const isSystem = msg.senderRole === 'system';
           const att = msg.attachment || msg.metadata?.attachment;
 
@@ -536,13 +585,42 @@ export default function CustomerPortal({
               </div>
 
               <div
-                className={`max-w-[72%] rounded-2xl px-5 py-3.5 text-[15px] leading-relaxed ${
+                className={`max-w-[75%] rounded-2xl px-5 py-3.5 text-[15px] leading-relaxed ${
                   isMe
                     ? 'bg-[#181818] border border-[#2A2A2A] text-[#FFFFFF]'
                     : 'bg-[#121212] border border-[#222222] text-[#EAEAEA]'
                 }`}
               >
+                {/* Original Message Text */}
                 <p className="whitespace-pre-wrap">{msg.text}</p>
+
+                {/* Multilingual Translation for Agent Messages when customer selected non-English */}
+                {isAgent && currentLang !== 'en' && (
+                  <div className="mt-2.5 pt-2 border-t border-[#262626] text-xs">
+                    {agentTranslationsMap[msg.id] ? (
+                      <div className="bg-[#161616] p-2.5 rounded-lg border border-[#242424] space-y-1">
+                        <div className="flex items-center space-x-1.5 text-[10px] text-[#7CFF00] font-semibold">
+                          <Globe className="w-3 h-3" />
+                          <span>{t.translationLabel}</span>
+                        </div>
+                        <p className="text-[#E0E0E0] italic text-xs leading-relaxed">
+                          "{agentTranslationsMap[msg.id]}"
+                        </p>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => handleTranslateAgentMessage(msg.id, msg.text, currentLang)}
+                        disabled={translatingAgentIds.has(msg.id)}
+                        className="text-[11px] text-[#60A5FA] hover:text-[#93C5FD] underline flex items-center space-x-1 transition-colors"
+                      >
+                        <Globe className="w-3 h-3" />
+                        <span>
+                          {translatingAgentIds.has(msg.id) ? t.translating : t.viewTranslation}
+                        </span>
+                      </button>
+                    )}
+                  </div>
+                )}
 
                 {/* Render Customer Image Attachments */}
                 {att && att.dataUrl && (
@@ -638,18 +716,20 @@ export default function CustomerPortal({
         </div>
       )}
 
-      {/* Smart Quick Actions Strip */}
-      <div className="px-6 py-2 bg-[#0D0D0D] border-t border-[#181818] flex items-center space-x-2 overflow-x-auto no-scrollbar shrink-0">
-        <span className="text-[11px] text-[#555555] shrink-0 font-bold uppercase">{t.quickAskPrefix}</span>
-        {smartActions.map((action) => (
-          <button
-            key={action.key}
-            onClick={() => handleQuickAction(action.key)}
-            className="text-xs whitespace-nowrap bg-[#141414] hover:bg-[#1E1E1E] text-[#8A8A8A] hover:text-[#FFFFFF] hover:border-[#7CFF00]/40 px-3 py-1 rounded-full border border-[#222222] transition-colors"
-          >
-            {action.label}
-          </button>
-        ))}
+      {/* Smart Quick Actions Strip: Smooth horizontal scroll with visible scrollbar & full end accessibility */}
+      <div className="px-4 md:px-6 py-2.5 bg-[#0D0D0D] border-t border-[#181818] w-full overflow-x-auto scrollbar-thin scrollbar-thumb-[#252525] shrink-0">
+        <div className="flex items-center gap-2 min-w-max pr-6">
+          <span className="text-[11px] text-[#555555] shrink-0 font-bold uppercase tracking-wider">{t.quickAskPrefix}</span>
+          {smartActions.map((action) => (
+            <button
+              key={action.key}
+              onClick={() => handleQuickAction(action.key)}
+              className="text-xs whitespace-nowrap bg-[#141414] hover:bg-[#1E1E1E] text-[#8A8A8A] hover:text-[#FFFFFF] hover:border-[#7CFF00]/40 px-3.5 py-1.5 rounded-full border border-[#222222] transition-colors shadow-sm"
+            >
+              {action.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Image Attachment Preview Strip */}

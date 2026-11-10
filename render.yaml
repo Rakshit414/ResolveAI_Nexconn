@@ -15,7 +15,7 @@ services:
     region: singapore
     plan: free # 100% Free Tier (512 MB RAM, 0.1 CPU, zero monthly spend)
     branch: feature/checkpoint-c-storefront-widget
-    buildCommand: npm --prefix server install && npm --prefix client install && npm --prefix client run build
+    buildCommand: npm --prefix server install --omit=dev && npm --prefix client install --include=dev && npm --prefix client run build
     startCommand: node server/src/server.js
     envVars:
       - key: NODE_ENV

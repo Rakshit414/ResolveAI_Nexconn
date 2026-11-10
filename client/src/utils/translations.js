@@ -28,6 +28,7 @@ export const TRANSLATIONS = {
     sending: "Sending...",
     attachPhoto: "Attach Photo",
     removeAttachment: "Remove",
+    downloadAttachment: "Download",
     downloadTranscript: "Transcript",
     fontSize: "Font Size",
     
@@ -108,6 +109,7 @@ export const TRANSLATIONS = {
     sending: "भेज रहे हैं...",
     attachPhoto: "फ़ोटो संलग्न करें",
     removeAttachment: "हटाएं",
+    downloadAttachment: "डाउनलोड",
     downloadTranscript: "ट्रांसक्रिप्ट",
     fontSize: "फ़ॉन्ट आकार",
     
@@ -188,6 +190,7 @@ export const TRANSLATIONS = {
     sending: "पाठवत आहे...",
     attachPhoto: "फोटो जोडा",
     removeAttachment: "काढा",
+    downloadAttachment: "डाउनलोड",
     downloadTranscript: "ट्रान्सक्रिप्ट",
     fontSize: "फॉन्ट आकार",
     

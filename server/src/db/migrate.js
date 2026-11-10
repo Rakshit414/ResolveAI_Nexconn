@@ -36,6 +36,7 @@ export async function runMigration({ dryRun = false } = {}) {
     { version: '001_canonical_schema', filename: '001_canonical_schema.sql', isSeed: false },
     { version: '002_seed_demo_data', filename: '002_seed_demo_data.sql', isSeed: true },
     { version: '003_attachment_blob_storage', filename: '003_attachment_blob_storage.sql', isSeed: false },
+    { version: '004_seed_sample_attachment', filename: '004_seed_sample_attachment.sql', isSeed: true },
   ];
 
   const migrationData = migrationFiles.map(m => {

@@ -9,7 +9,9 @@ import {
   Inbox,
   Globe,
   X,
-  Image as ImageIcon
+  Image as ImageIcon,
+  ArrowDownToLine,
+  Loader2
 } from 'lucide-react';
 import { translateText } from '../services/api';
 
@@ -31,7 +33,66 @@ export default function ChatWindow({
   const [lightboxImage, setLightboxImage] = useState(null);
   const [translationsMap, setTranslationsMap] = useState({});
   const [translatingIds, setTranslatingIds] = useState(new Set());
+  const [downloadingAttId, setDownloadingAttId] = useState(null);
+  const [downloadError, setDownloadError] = useState({});
   const messagesEndRef = useRef(null);
+
+  const handleDownloadAttachment = async (att) => {
+    const attKey = att.id || att.name || 'attachment';
+    try {
+      setDownloadingAttId(attKey);
+      setDownloadError((prev) => ({ ...prev, [attKey]: null }));
+
+      // 1. If attachment has an ID, request authorized server download endpoint
+      if (att.id) {
+        const res = await fetch(`/api/attachments/${encodeURIComponent(att.id)}/download`, {
+          method: 'GET',
+          headers: {
+            'X-Agent-Id': 'user_sarah_lin',
+            'X-Brand-Id': 'brand_novacart'
+          },
+          credentials: 'include'
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || `Download failed with HTTP ${res.status}`);
+        }
+
+        const blob = await res.blob();
+        const objectUrl = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = objectUrl;
+        link.download = att.name || 'attachment.png';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(objectUrl);
+        return;
+      }
+
+      // 2. Fallback: if att.dataUrl exists and no server ID
+      if (att.dataUrl) {
+        const link = document.createElement('a');
+        link.href = att.dataUrl;
+        link.download = att.name || 'attachment.png';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        return;
+      }
+
+      throw new Error('No attachment data available for download.');
+    } catch (err) {
+      console.error('[Attachment Download Failed]:', err);
+      setDownloadError((prev) => ({ ...prev, [attKey]: err.message || 'Download failed' }));
+      setTimeout(() => {
+        setDownloadError((prev) => ({ ...prev, [attKey]: null }));
+      }, 4000);
+    } finally {
+      setDownloadingAttId(null);
+    }
+  };
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -326,26 +387,58 @@ export default function ChatWindow({
                 <p className="whitespace-pre-wrap">{msg.text}</p>
 
                 {/* Image Attachment Rendering */}
-                {att && att.dataUrl && (
-                  <div className="mt-3 pt-2.5 border-t border-[#222222] space-y-1.5">
-                    <div 
-                      onClick={() => setLightboxImage(att.dataUrl)}
-                      className="cursor-pointer group relative overflow-hidden rounded-xl border border-[#2A2A2A] max-w-[280px] bg-[#0A0A0A] hover:border-[#7CFF00]/50 transition-colors"
-                    >
-                      <img
-                        src={att.dataUrl}
-                        alt={att.name || 'Attachment'}
-                        className="max-h-52 w-full object-cover group-hover:scale-105 transition-transform duration-200"
-                      />
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-xs text-white font-medium">
-                        Click to view full photo
+                {att && (att.dataUrl || att.id) && (
+                  <div className="mt-3 pt-2.5 border-t border-[#222222] space-y-2">
+                    {att.dataUrl && (
+                      <div 
+                        onClick={() => setLightboxImage(att.dataUrl)}
+                        className="cursor-pointer group relative overflow-hidden rounded-xl border border-[#2A2A2A] max-w-[280px] bg-[#0A0A0A] hover:border-[#7CFF00]/50 transition-colors"
+                      >
+                        <img
+                          src={att.dataUrl}
+                          alt={att.name || 'Attachment'}
+                          className="max-h-52 w-full object-cover group-hover:scale-105 transition-transform duration-200"
+                        />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-xs text-white font-medium">
+                          Click to view full photo
+                        </div>
                       </div>
+                    )}
+                    <div className="flex items-center justify-between text-[11px] text-[#8A8A8A] max-w-[280px] gap-2">
+                      <div className="flex items-center space-x-1.5 min-w-0 truncate">
+                        <ImageIcon className="w-3.5 h-3.5 text-[#7CFF00] shrink-0" />
+                        <span className="truncate text-[#CCCCCC]" title={att.name}>{att.name}</span>
+                        {att.size && <span className="text-[10px] text-[#777777] shrink-0">({Math.round(att.size / 1024)} KB)</span>}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDownloadAttachment(att);
+                        }}
+                        disabled={downloadingAttId === (att.id || att.name)}
+                        className="inline-flex items-center space-x-1 px-2 py-1 rounded bg-[#181818] hover:bg-[#222222] border border-[#2E2E2E] hover:border-[#7CFF00]/50 text-[#7CFF00] text-[10px] font-semibold transition-all shadow-sm shrink-0 disabled:opacity-50"
+                        title={`Download ${att.name || 'attachment'}`}
+                        aria-label={`Download ${att.name || 'attachment'}`}
+                      >
+                        {downloadingAttId === (att.id || att.name) ? (
+                          <>
+                            <Loader2 className="w-3 h-3 animate-spin text-[#7CFF00]" />
+                            <span className="font-mono">Saving...</span>
+                          </>
+                        ) : (
+                          <>
+                            <ArrowDownToLine className="w-3 h-3 text-[#7CFF00]" />
+                            <span>Download</span>
+                          </>
+                        )}
+                      </button>
                     </div>
-                    <div className="flex items-center space-x-2 text-[11px] text-[#8A8A8A]">
-                      <ImageIcon className="w-3.5 h-3.5 text-[#7CFF00] shrink-0" />
-                      <span className="truncate max-w-[180px] text-[#CCCCCC]">{att.name}</span>
-                      {att.size && <span>({Math.round(att.size / 1024)} KB)</span>}
-                    </div>
+                    {downloadError[att.id || att.name] && (
+                      <div className="text-[10px] text-[#FF4D4D] bg-[#2A0808] px-2 py-0.5 rounded border border-[#551010] animate-fadeIn">
+                        {downloadError[att.id || att.name]}
+                      </div>
+                    )}
                   </div>
                 )}
 

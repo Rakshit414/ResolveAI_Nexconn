@@ -69,8 +69,12 @@ class NexconnManager {
               const merged = [...currentList];
               for (const msg of parsed[chId]) {
                 const msgId = msg.id || msg.messageId;
-                if (!merged.some(m => m.id === msgId || m.messageId === msgId)) {
+                const existingIndex = merged.findIndex(m => m.id === msgId || m.messageId === msgId);
+                if (existingIndex === -1) {
                   merged.push(msg);
+                } else if (!msg.attachment && merged[existingIndex].attachment) {
+                  // Preserve seeded attachment on seed messages
+                  msg.attachment = merged[existingIndex].attachment;
                 }
                 if (msgId) this.seenMessageIds.add(msgId);
               }
@@ -187,6 +191,7 @@ class NexconnManager {
         senderAvatar: c.avatar,
         targetUserId: 'agent_sarah',
         text: c.order.initialMessage,
+        attachment: c.sampleAttachment || null,
         timestamp: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
         orderId: c.order.orderId,
       };

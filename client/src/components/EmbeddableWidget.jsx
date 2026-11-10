@@ -13,7 +13,9 @@ import {
   RotateCcw, 
   AlertCircle, 
   MessageCircleQuestion, 
-  Download, 
+  Download,
+  ArrowDownToLine,
+  Loader2,
   Globe, 
   ExternalLink,
   Minimize2,
@@ -62,6 +64,8 @@ export default function EmbeddableWidget({
   const [showOrderDrawer, setShowOrderDrawer] = useState(false);
   const [currentLang, setCurrentLang] = useState('en');
   const [attachment, setAttachment] = useState(null);
+  const [downloadingAttId, setDownloadingAttId] = useState(null);
+  const [downloadError, setDownloadError] = useState({});
   const [isExpanded, setIsExpanded] = useState(false); // Expanded desktop view
   const [connectionStatus, setConnectionStatus] = useState('connecting');
 
@@ -267,7 +271,7 @@ export default function EmbeddableWidget({
     }
   };
 
-  // File upload handler
+  // File upload handler with backend PostgreSQL BYTEA persistence
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -278,16 +282,114 @@ export default function EmbeddableWidget({
     }
 
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
+      const dataUrl = event.target.result;
       setAttachment({
         name: file.name,
         type: file.type,
         size: file.size,
-        dataUrl: event.target.result
+        dataUrl,
+        uploading: true
       });
+
+      try {
+        const ticketId = activeCustomer.ticket?.id || `tkt_${activeCustomer.order?.orderId || '1021'}`;
+        const res = await fetch('/api/attachments/upload', {
+          method: 'POST',
+          headers: {
+            'Content-Type': file.type,
+            'X-File-Name': file.name,
+            'X-Ticket-Id': ticketId,
+            'X-Brand-Id': brandId,
+            'X-Customer-Id': activeCustomer.id
+          },
+          body: file
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.attachment) {
+            setAttachment({
+              id: data.attachment.id,
+              name: file.name,
+              type: file.type,
+              size: file.size,
+              dataUrl,
+              downloadUrl: data.attachment.downloadUrl,
+              uploading: false
+            });
+            return;
+          }
+        }
+      } catch (uploadErr) {
+        console.warn('[Widget attachment upload fallback to local preview]:', uploadErr.message);
+      }
+
+      setAttachment(prev => (prev ? { ...prev, uploading: false } : null));
     };
     reader.readAsDataURL(file);
     e.target.value = '';
+  };
+
+  // Download attachment handler with session authorization
+  const handleDownloadAttachment = async (att) => {
+    const attKey = att.id || att.name || 'attachment';
+    try {
+      setDownloadingAttId(attKey);
+      setDownloadError((prev) => ({ ...prev, [attKey]: null }));
+
+      if (att.id) {
+        const headers = {
+          'X-Customer-Id': activeCustomer.id,
+          'X-Brand-Id': brandId
+        };
+        if (sessionToken) {
+          headers['Authorization'] = `Bearer ${sessionToken}`;
+        }
+
+        const res = await fetch(`/api/attachments/${encodeURIComponent(att.id)}/download`, {
+          method: 'GET',
+          headers,
+          credentials: 'include'
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || `Download failed with HTTP ${res.status}`);
+        }
+
+        const blob = await res.blob();
+        const objectUrl = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = objectUrl;
+        link.download = att.name || 'attachment.png';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(objectUrl);
+        return;
+      }
+
+      if (att.dataUrl) {
+        const link = document.createElement('a');
+        link.href = att.dataUrl;
+        link.download = att.name || 'attachment.png';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        return;
+      }
+
+      throw new Error('No attachment data available for download.');
+    } catch (err) {
+      console.error('[Widget Download Failed]:', err);
+      setDownloadError((prev) => ({ ...prev, [attKey]: err.message || 'Download failed' }));
+      setTimeout(() => {
+        setDownloadError((prev) => ({ ...prev, [attKey]: null }));
+      }, 4000);
+    } finally {
+      setDownloadingAttId(null);
+    }
   };
 
   // Transcript download
@@ -603,16 +705,42 @@ export default function EmbeddableWidget({
                 )}
 
                 {/* Attachment if present */}
-                {msg.attachment?.dataUrl && (
-                  <div className="mt-2 rounded-lg overflow-hidden border border-[#333333]">
-                    <img 
-                      src={msg.attachment.dataUrl} 
-                      alt={msg.attachment.name || "Attachment"} 
-                      className="max-h-48 object-cover w-full"
-                    />
-                    <div className="bg-[#111111] px-2 py-1 text-[10px] text-[#888888] truncate">
-                      {msg.attachment.name}
+                {msg.attachment && (msg.attachment.dataUrl || msg.attachment.id) && (
+                  <div className="mt-2 rounded-lg overflow-hidden border border-[#333333] space-y-1">
+                    {msg.attachment.dataUrl && (
+                      <img 
+                        src={msg.attachment.dataUrl} 
+                        alt={msg.attachment.name || "Attachment"} 
+                        className="max-h-48 object-cover w-full"
+                      />
+                    )}
+                    <div className="bg-[#111111] px-2.5 py-1.5 flex items-center justify-between text-[10px] text-[#888888] gap-2">
+                      <span className="truncate text-[#CCCCCC]" title={msg.attachment.name}>
+                        {msg.attachment.name}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDownloadAttachment(msg.attachment);
+                        }}
+                        disabled={downloadingAttId === (msg.attachment.id || msg.attachment.name)}
+                        className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded bg-[#1A1A1A] hover:bg-[#252525] border border-[#333333] hover:border-[#7CFF00]/50 text-[#7CFF00] font-medium transition-colors shrink-0 disabled:opacity-50"
+                        title={`Download ${msg.attachment.name || 'attachment'}`}
+                      >
+                        {downloadingAttId === (msg.attachment.id || msg.attachment.name) ? (
+                          <Loader2 className="w-2.5 h-2.5 animate-spin text-[#7CFF00]" />
+                        ) : (
+                          <ArrowDownToLine className="w-2.5 h-2.5 text-[#7CFF00]" />
+                        )}
+                        <span>Download</span>
+                      </button>
                     </div>
+                    {downloadError[msg.attachment.id || msg.attachment.name] && (
+                      <div className="bg-[#2A0808] text-[#FF4D4D] text-[9px] px-2 py-0.5 border border-[#551010]">
+                        {downloadError[msg.attachment.id || msg.attachment.name]}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

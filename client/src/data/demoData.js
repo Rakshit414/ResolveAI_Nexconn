@@ -141,6 +141,14 @@ export const DEMO_CUSTOMERS = [
       reportedIssue: "Wrong product received - Package contained wired sports earphones instead of NovaBass ANC wireless",
       initialMessage: "I am really annoyed. I ordered the NovaBass Wireless ANC Headphones (NC1023) and today I opened the box and found cheap wired sports earphones inside! Please fix this immediately."
     },
+    sampleAttachment: {
+      id: "att_seed_sample_nc1023",
+      name: "wrong_wired_earphones_nc1023.png",
+      size: 68,
+      type: "image/png",
+      dataUrl: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAG0lEQVR4nGNgAAMAACQAATkVvFUAAAAASUVORK5CYII=",
+      downloadUrl: "/api/attachments/att_seed_sample_nc1023/download"
+    },
     ticket: {
       id: "tkt_1023",
       orderId: "NC1023",

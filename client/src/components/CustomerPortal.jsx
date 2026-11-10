@@ -10,6 +10,8 @@ import {
   Image as ImageIcon,
   X,
   Download,
+  ArrowDownToLine,
+  Loader2,
   Globe,
   Star,
   PackageSearch,
@@ -52,6 +54,8 @@ export default function CustomerPortal({
   // Attachment Support
   const [attachment, setAttachment] = useState(null);
   const [lightboxImage, setLightboxImage] = useState(null);
+  const [downloadingAttId, setDownloadingAttId] = useState(null);
+  const [downloadError, setDownloadError] = useState({});
   const fileInputRef = useRef(null);
 
   // Resolution Feedback State
@@ -184,7 +188,7 @@ export default function CustomerPortal({
     };
   }, [customer?.id]);
 
-  // Handle File Selection for Image Attachments (<5MB)
+  // Handle File Selection for Image Attachments (<5MB) with automatic backend persistence
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -200,16 +204,117 @@ export default function CustomerPortal({
     }
 
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
+      const dataUrl = reader.result;
+      
+      // Immediate optimistic attachment preview
       setAttachment({
         name: file.name,
         size: file.size,
         type: file.type,
-        dataUrl: reader.result,
+        dataUrl,
+        uploading: true
       });
+
+      // Upload directly to PostgreSQL BYTEA persistent storage
+      try {
+        const ticketId = customer?.ticket?.id;
+        const brandId = 'brand_novacart';
+        const customerId = customer?.id;
+
+        const res = await fetch('/api/attachments/upload', {
+          method: 'POST',
+          headers: {
+            'Content-Type': file.type,
+            'X-File-Name': file.name,
+            'X-Ticket-Id': ticketId || '',
+            'X-Brand-Id': brandId,
+            'X-Customer-Id': customerId || ''
+          },
+          body: file
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.attachment) {
+            setAttachment({
+              id: data.attachment.id,
+              name: file.name,
+              size: file.size,
+              type: file.type,
+              dataUrl,
+              downloadUrl: data.attachment.downloadUrl,
+              uploading: false
+            });
+            return;
+          }
+        }
+      } catch (uploadErr) {
+        console.warn('[Attachment upload fallback to local preview]:', uploadErr.message);
+      }
+
+      setAttachment(prev => (prev ? { ...prev, uploading: false } : null));
     };
     reader.readAsDataURL(file);
     e.target.value = '';
+  };
+
+  // Download attachment handler with customer authorization checks
+  const handleDownloadAttachment = async (att) => {
+    const attKey = att.id || att.name || 'attachment';
+    try {
+      setDownloadingAttId(attKey);
+      setDownloadError((prev) => ({ ...prev, [attKey]: null }));
+
+      // 1. If attachment has an ID, request authorized server download endpoint
+      if (att.id) {
+        const res = await fetch(`/api/attachments/${encodeURIComponent(att.id)}/download`, {
+          method: 'GET',
+          headers: {
+            'X-Customer-Id': customer?.id || '',
+            'X-Brand-Id': 'brand_novacart'
+          },
+          credentials: 'include'
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || `Download failed with HTTP ${res.status}`);
+        }
+
+        const blob = await res.blob();
+        const objectUrl = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = objectUrl;
+        link.download = att.name || 'attachment.png';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(objectUrl);
+        return;
+      }
+
+      // 2. Fallback: if att.dataUrl exists and no server ID
+      if (att.dataUrl) {
+        const link = document.createElement('a');
+        link.href = att.dataUrl;
+        link.download = att.name || 'attachment.png';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        return;
+      }
+
+      throw new Error('No attachment data available for download.');
+    } catch (err) {
+      console.error('[Attachment Download Failed]:', err);
+      setDownloadError((prev) => ({ ...prev, [attKey]: err.message || 'Download failed' }));
+      setTimeout(() => {
+        setDownloadError((prev) => ({ ...prev, [attKey]: null }));
+      }, 4000);
+    } finally {
+      setDownloadingAttId(null);
+    }
   };
 
   // Translate agent responses for multilingual customers
@@ -989,22 +1094,55 @@ export default function CustomerPortal({
                   )}
 
                   {/* Render Customer Image Attachments */}
-                  {att && att.dataUrl && (
-                    <div className="mt-3 pt-2 border-t border-[#222222] space-y-1.5">
-                      <div 
-                        onClick={() => setLightboxImage(att.dataUrl)}
-                        className="cursor-pointer group relative overflow-hidden rounded-xl border border-[#2A2A2A] max-w-[260px] bg-[#0A0A0A] hover:border-[#7CFF00]/50 transition-colors"
-                      >
-                        <img
-                          src={att.dataUrl}
-                          alt={att.name || 'Photo'}
-                          className="max-h-48 w-full object-cover group-hover:scale-105 transition-transform duration-200"
-                        />
+                  {att && (att.dataUrl || att.id) && (
+                    <div className="mt-3 pt-2 border-t border-[#222222] space-y-2">
+                      {att.dataUrl && (
+                        <div 
+                          onClick={() => setLightboxImage(att.dataUrl)}
+                          className="cursor-pointer group relative overflow-hidden rounded-xl border border-[#2A2A2A] max-w-[260px] bg-[#0A0A0A] hover:border-[#7CFF00]/50 transition-colors"
+                        >
+                          <img
+                            src={att.dataUrl}
+                            alt={att.name || 'Photo'}
+                            className="max-h-48 w-full object-cover group-hover:scale-105 transition-transform duration-200"
+                          />
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between text-[11px] text-[#8A8A8A] max-w-[260px] gap-2">
+                        <div className="flex items-center space-x-1.5 min-w-0 truncate">
+                          <ImageIcon className="w-3.5 h-3.5 text-[#7CFF00] shrink-0" />
+                          <span className="truncate text-[#CCCCCC]" title={att.name}>{att.name}</span>
+                          {att.size && <span className="text-[10px] text-[#777777] shrink-0">({Math.round(att.size / 1024)} KB)</span>}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDownloadAttachment(att);
+                          }}
+                          disabled={downloadingAttId === (att.id || att.name)}
+                          className="inline-flex items-center space-x-1 px-2 py-1 rounded bg-[#181818] hover:bg-[#222222] border border-[#2E2E2E] hover:border-[#7CFF00]/50 text-[#7CFF00] text-[10px] font-semibold transition-all shadow-sm shrink-0 disabled:opacity-50"
+                          title={`${t.downloadAttachment || 'Download'} ${att.name || 'attachment'}`}
+                          aria-label={`${t.downloadAttachment || 'Download'} ${att.name || 'attachment'}`}
+                        >
+                          {downloadingAttId === (att.id || att.name) ? (
+                            <>
+                              <Loader2 className="w-3 h-3 animate-spin text-[#7CFF00]" />
+                              <span className="font-mono">...</span>
+                            </>
+                          ) : (
+                            <>
+                              <ArrowDownToLine className="w-3 h-3 text-[#7CFF00]" />
+                              <span>{t.downloadAttachment || 'Download'}</span>
+                            </>
+                          )}
+                        </button>
                       </div>
-                      <div className="flex items-center space-x-2 text-[11px] text-[#8A8A8A]">
-                        <ImageIcon className="w-3.5 h-3.5 text-[#7CFF00] shrink-0" />
-                        <span className="truncate max-w-[160px] text-[#CCCCCC]">{att.name}</span>
-                      </div>
+                      {downloadError[att.id || att.name] && (
+                        <div className="text-[10px] text-[#FF4D4D] bg-[#2A0808] px-2 py-0.5 rounded border border-[#551010] animate-fadeIn">
+                          {downloadError[att.id || att.name]}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

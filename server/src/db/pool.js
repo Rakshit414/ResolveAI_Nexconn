@@ -17,9 +17,12 @@ export function getPool() {
 
   if (databaseUrl) {
     // Production / Dedicated PostgreSQL Pool
+    const isLocalhost = databaseUrl.includes('localhost') || databaseUrl.includes('127.0.0.1');
+    const useSsl = process.env.NODE_ENV === 'production' && !isLocalhost && !databaseUrl.includes('sslmode=disable');
+
     pool = new Pool({
       connectionString: databaseUrl,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+      ssl: useSsl ? { rejectUnauthorized: false } : false,
       max: 20,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 5000,
@@ -30,6 +33,11 @@ export function getPool() {
     });
 
     return pool;
+  }
+
+  // Fail-closed in production if DATABASE_URL is missing
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('[DB Pool Fatal Error] DATABASE_URL is missing in production environment. Fallback to in-memory/JSON storage is strictly prohibited.');
   }
 
   // Development / Test in-memory PostgreSQL emulator
@@ -60,12 +68,19 @@ export async function query(text, params) {
 }
 
 export async function healthCheck() {
+  if (process.env.NODE_ENV === 'production' && !process.env.DATABASE_URL) {
+    return {
+      healthy: false,
+      mode: 'unconfigured',
+      error: 'DATABASE_URL is missing in production environment. In-memory or JSON storage fallback is strictly prohibited.'
+    };
+  }
   try {
     const p = getPool();
     const res = await p.query('SELECT 1 as healthy');
     return { healthy: res.rows?.[0]?.healthy === 1 || res.rows?.[0]?.healthy === '1', mode: process.env.DATABASE_URL ? 'postgresql' : 'in-memory' };
   } catch (err) {
-    return { healthy: false, error: err.message };
+    return { healthy: false, mode: process.env.DATABASE_URL ? 'postgresql' : 'in-memory', error: err.message };
   }
 }
 

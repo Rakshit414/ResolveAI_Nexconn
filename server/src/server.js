@@ -60,12 +60,13 @@ app.get('/widget.js', (req, res) => {
 app.get('/api/health', async (req, res) => {
   const dbHealth = await healthCheck().catch(err => ({ healthy: false, error: err.message }));
   
-  // In production, if database is unreachable, return 503 Service Unavailable
-  if (process.env.NODE_ENV === 'production' && process.env.DATABASE_URL && !dbHealth.healthy) {
+  // In production, if database is unreachable or missing DATABASE_URL, return 503 Service Unavailable
+  if (process.env.NODE_ENV === 'production' && (!dbHealth.healthy || dbHealth.mode !== 'postgresql')) {
     return res.status(503).json({
-      status: 'degraded',
+      status: 'unhealthy',
       service: 'Resolve AI Backend Service',
       database: dbHealth,
+      error: 'Production database failure: DATABASE_URL must be configured and connected to PostgreSQL',
       timestamp: new Date().toISOString()
     });
   }
@@ -108,6 +109,15 @@ app.use((err, req, res, next) => {
 app.listen(PORT, () => {
   console.log(`=========================================`);
   console.log(`Resolve AI Server running on port ${PORT}`);
+  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  if (process.env.NODE_ENV === 'production') {
+    if (!process.env.DATABASE_URL) {
+      console.error(`[PRODUCTION FAIL-CLOSED WARNING] DATABASE_URL is NOT set.`);
+      console.error(`[PRODUCTION FAIL-CLOSED WARNING] In-memory and JSON fallbacks are strictly prohibited. Readiness checks will fail.`);
+    } else {
+      console.log(`[PRODUCTION] Connected to PostgreSQL via DATABASE_URL.`);
+    }
+  }
   console.log(`Health check: http://localhost:${PORT}/api/health`);
   console.log(`=========================================`);
 });

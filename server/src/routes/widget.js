@@ -134,6 +134,14 @@ router.get('/config', async (req, res) => {
       badgeText: '24/7 AI Support'
     };
 
+    const isProduction = process.env.NODE_ENV === 'production';
+    const sanitizedAllowedOrigins = (brand.allowed_origins || []).filter(origin => {
+      if (isProduction && (origin.includes('localhost') || origin.includes('127.0.0.1'))) {
+        return false;
+      }
+      return true;
+    });
+
     return res.json({
       success: true,
       brand: {
@@ -141,7 +149,8 @@ router.get('/config', async (req, res) => {
         name: brand.name,
         slug: brand.slug,
         logoUrl: brand.logo_url,
-        supportIdentity: brand.support_identity
+        supportIdentity: brand.support_identity,
+        allowedOrigins: sanitizedAllowedOrigins
       },
       theme,
       policies,

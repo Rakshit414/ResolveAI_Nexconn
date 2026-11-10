@@ -11,6 +11,7 @@ import {
   ShoppingBag
 } from 'lucide-react';
 import { DEMO_CUSTOMERS } from '../data/demoData';
+import { useCart } from '../context/CartContext';
 
 export default function Navbar({ 
   currentCustomer, 
@@ -19,6 +20,7 @@ export default function Navbar({
 }) {
   const location = useLocation();
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const { itemCount, openCart } = useCart();
 
   const isActive = (path) => {
     if (path === '/store') {
@@ -159,6 +161,26 @@ export default function Navbar({
               </div>
             )}
           </div>
+
+          {/* Universal Cart Button */}
+          <button
+            id="btn-nav-cart"
+            onClick={openCart}
+            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs bg-[#121212] hover:bg-[#181818] border border-[#222222] hover:border-[#7CFF00]/50 text-[#FFFFFF] transition-all group"
+            title="Shopping Bag"
+            aria-label="Open shopping bag"
+          >
+            <ShoppingBag className="w-3.5 h-3.5 text-[#7CFF00] group-hover:scale-110 transition-transform" />
+            <span className="hidden sm:inline font-semibold">Cart</span>
+            <span 
+              id="nav-cart-badge-count"
+              className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                itemCount > 0 ? 'bg-[#7CFF00] text-[#090909] font-black shadow-neon-sm' : 'bg-[#222222] text-[#777777]'
+              }`}
+            >
+              {itemCount}
+            </span>
+          </button>
 
           {/* Policies Drawer Button */}
           <button

@@ -24,6 +24,7 @@ import { DEMO_CUSTOMERS } from '../data/demoData';
 import EmbeddableWidget from './EmbeddableWidget';
 import WidgetEmbedPreviewModal from './WidgetEmbedPreviewModal';
 import CartDrawer from './CartDrawer';
+import { useCart } from '../context/CartContext';
 
 // Complete Storefront Catalog
 const CATALOG_PRODUCTS = [
@@ -33,6 +34,7 @@ const CATALOG_PRODUCTS = [
     subtitle: "Engineered responsive cushioning with breathable mesh",
     category: "Footwear",
     price: 119.99,
+    unitPriceCents: 11999,
     rating: 4.8,
     reviewsCount: 1248,
     image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=600&q=80",
@@ -48,6 +50,7 @@ const CATALOG_PRODUCTS = [
     subtitle: "Titanium bezel, 7-day battery & advanced health metrics",
     category: "Wearables",
     price: 249.50,
+    unitPriceCents: 24950,
     rating: 4.9,
     reviewsCount: 892,
     image: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=600&q=80",
@@ -63,6 +66,7 @@ const CATALOG_PRODUCTS = [
     subtitle: "Hybrid 40dB active noise cancellation with Hi-Res audio",
     category: "Audio",
     price: 89.00,
+    unitPriceCents: 8900,
     rating: 4.7,
     reviewsCount: 2105,
     image: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=600&q=80",
@@ -78,6 +82,7 @@ const CATALOG_PRODUCTS = [
     subtitle: "Double-wall 18/8 pro-grade stainless steel, keeps cold 24h",
     category: "Accessories",
     price: 34.99,
+    unitPriceCents: 3499,
     rating: 4.9,
     reviewsCount: 640,
     image: "https://images.unsplash.com/photo-1602143407151-7111542de6e8?auto=format&fit=crop&w=600&q=80",
@@ -92,6 +97,7 @@ const CATALOG_PRODUCTS = [
     subtitle: "Reinforced heel & toe, blister protection, anti-odor merino",
     category: "Footwear",
     price: 24.00,
+    unitPriceCents: 2400,
     rating: 4.6,
     reviewsCount: 412,
     image: "https://images.unsplash.com/photo-1582966772680-860e372bb558?auto=format&fit=crop&w=600&q=80",
@@ -106,6 +112,7 @@ const CATALOG_PRODUCTS = [
     subtitle: "Fast simultaneous induction charging for smartphone & watch",
     category: "Accessories",
     price: 45.00,
+    unitPriceCents: 4500,
     rating: 4.8,
     reviewsCount: 310,
     image: "https://images.unsplash.com/photo-1586816879360-004f5b0c51e5?auto=format&fit=crop&w=600&q=80",
@@ -116,52 +123,6 @@ const CATALOG_PRODUCTS = [
   }
 ];
 
-const CART_STORAGE_KEY = 'novacart_storefront_cart';
-
-const getInitialCart = () => {
-  try {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      const saved = window.localStorage.getItem(CART_STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          return parsed.filter(item => 
-            item && 
-            typeof item.id === 'string' && 
-            typeof item.price === 'number' && 
-            typeof item.quantity === 'number' && 
-            item.quantity > 0
-          );
-        }
-      }
-    }
-  } catch (e) {
-    console.warn('[NovaCart Storefront] Error reading cart from localStorage:', e);
-  }
-
-  // Default initial cart: 2 items matching initial demo badge
-  return [
-    {
-      id: "prod_shoes",
-      variantId: "prod_shoes_Size 10 (US)",
-      name: "NovaSprint Pro Running Shoes",
-      price: 119.99,
-      quantity: 1,
-      image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=600&q=80",
-      variant: "Size 10 (US)"
-    },
-    {
-      id: "prod_charger",
-      variantId: "prod_charger_Obsidian Black",
-      name: "NovaCharge Dual 15W Qi Wireless Pad",
-      price: 45.00,
-      quantity: 1,
-      image: "https://images.unsplash.com/photo-1586816879360-004f5b0c51e5?auto=format&fit=crop&w=600&q=80",
-      variant: "Obsidian Black"
-    }
-  ];
-};
-
 export default function NovaCartStorefront({
   currentCustomer,
   onSelectCustomer
@@ -170,88 +131,22 @@ export default function NovaCartStorefront({
   const [searchQuery, setSearchQuery] = useState('');
   const [isWidgetOpen, setIsWidgetOpen] = useState(false);
   const [isEmbedModalOpen, setIsEmbedModalOpen] = useState(false);
-  const [isCartOpen, setIsCartOpen] = useState(false);
-  const [cart, setCart] = useState(getInitialCart);
   const [selectedVariants, setSelectedVariants] = useState({});
   const [addedFeedback, setAddedFeedback] = useState({});
   const [lookupOrderNumber, setLookupOrderNumber] = useState(currentCustomer?.order?.orderId || 'NC1021');
   const [activeOrderView, setActiveOrderView] = useState(currentCustomer?.order || DEMO_CUSTOMERS[0].order);
   const [customerDropdownOpen, setCustomerDropdownOpen] = useState(false);
 
-  // Sync cart to localStorage whenever cart state changes
-  useEffect(() => {
-    try {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
-      }
-    } catch (e) {
-      console.warn('[NovaCart Storefront] Error persisting cart to localStorage:', e);
-    }
-  }, [cart]);
+  // Single authoritative cart source of truth
+  const { itemCount, openCart, addToCart } = useCart();
 
-  // Dynamic total item count for cart badge
-  const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
-
-  // Add product to cart without creating duplicate entries for identical product and variant
-  const handleAddToCart = (product, chosenVariant) => {
-    const variant = chosenVariant || product.variants?.[0] || 'Standard';
-    const variantId = `${product.id}_${variant}`;
-
-    setCart(prevCart => {
-      const existingIdx = prevCart.findIndex(item => item.variantId === variantId);
-      if (existingIdx > -1) {
-        const next = [...prevCart];
-        next[existingIdx] = {
-          ...next[existingIdx],
-          quantity: next[existingIdx].quantity + 1
-        };
-        return next;
-      } else {
-        return [
-          ...prevCart,
-          {
-            id: product.id,
-            variantId,
-            name: product.name,
-            price: product.price,
-            quantity: 1,
-            image: product.image,
-            variant
-          }
-        ];
-      }
-    });
-
-    // Provide instant visual confirmation on card
+  const handleAddToCart = (product) => {
+    const chosenVariant = selectedVariants[product.id] || product.variants?.[0] || 'Standard';
+    addToCart(product, chosenVariant);
     setAddedFeedback(prev => ({ ...prev, [product.id]: true }));
     setTimeout(() => {
       setAddedFeedback(prev => ({ ...prev, [product.id]: false }));
     }, 1400);
-  };
-
-  // Stepper quantity update (+1 / -1)
-  const handleUpdateQuantity = (variantId, delta) => {
-    setCart(prevCart => {
-      return prevCart
-        .map(item => {
-          if (item.variantId === variantId) {
-            const nextQty = item.quantity + delta;
-            return nextQty > 0 ? { ...item, quantity: nextQty } : null;
-          }
-          return item;
-        })
-        .filter(Boolean);
-    });
-  };
-
-  // Remove individual line item
-  const handleRemoveItem = (variantId) => {
-    setCart(prevCart => prevCart.filter(item => item.variantId !== variantId));
-  };
-
-  // Clear all cart items
-  const handleClearCart = () => {
-    setCart([]);
   };
 
   // Filter products
@@ -379,7 +274,7 @@ export default function NovaCartStorefront({
             {/* Cart Button */}
             <button 
               id="btn-cart-toggle"
-              onClick={() => setIsCartOpen(true)}
+              onClick={openCart}
               className="relative p-2 rounded-xl bg-[#141414] hover:bg-[#1A1A1A] border border-[#222222] hover:border-[#7CFF00]/50 text-[#CCCCCC] hover:text-[#FFFFFF] transition-all group"
               title="Shopping Bag"
               aria-label="Open shopping bag"
@@ -388,10 +283,10 @@ export default function NovaCartStorefront({
               <span 
                 id="cart-badge-count" 
                 className={`absolute -top-1 -right-1 w-4 h-4 rounded-full text-[10px] font-bold flex items-center justify-center transition-all ${
-                  cartCount > 0 ? 'bg-[#7CFF00] text-[#090909] shadow-neon-sm font-extrabold' : 'bg-[#222222] text-[#777777]'
+                  itemCount > 0 ? 'bg-[#7CFF00] text-[#090909] shadow-neon-sm font-extrabold' : 'bg-[#222222] text-[#777777]'
                 }`}
               >
-                {cartCount}
+                {itemCount}
               </span>
             </button>
           </div>
@@ -695,7 +590,7 @@ export default function NovaCartStorefront({
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     id={`btn-add-to-cart-${product.id}`}
-                    onClick={() => handleAddToCart(product, selectedVariants[product.id] || product.variants?.[0])}
+                    onClick={() => handleAddToCart(product)}
                     className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all flex items-center justify-center space-x-1.5 ${
                       addedFeedback[product.id]
                         ? 'bg-[#7CFF00] text-[#090909] border-[#7CFF00] font-bold shadow-neon-sm'
@@ -841,12 +736,6 @@ export default function NovaCartStorefront({
 
       {/* 11. Shopping Bag Drawer & Demo Checkout */}
       <CartDrawer
-        isOpen={isCartOpen}
-        onClose={() => setIsCartOpen(false)}
-        cart={cart}
-        onUpdateQuantity={handleUpdateQuantity}
-        onRemoveItem={handleRemoveItem}
-        onClearCart={handleClearCart}
         onOpenSupportForOrder={(orderId) => {
           setLookupOrderNumber(orderId);
           setIsWidgetOpen(true);

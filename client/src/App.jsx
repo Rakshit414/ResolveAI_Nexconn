@@ -8,6 +8,7 @@ import PolicyDrawer from './components/PolicyDrawer';
 import NovaCartStorefront from './components/NovaCartStorefront';
 import WidgetFrame from './components/WidgetFrame';
 import { DEMO_CUSTOMERS } from './data/demoData';
+import { CartProvider } from './context/CartContext';
 
 export default function App() {
   const location = useLocation();
@@ -67,94 +68,96 @@ export default function App() {
   }
 
   return (
-    <div className="h-screen bg-[#090909] text-[#FFFFFF] flex flex-col font-sans overflow-hidden">
-      {/* Top Global Navigation Bar */}
-      <Navbar
-        currentCustomer={currentCustomer}
-        onSelectCustomer={handleSelectCustomer}
-        onOpenPolicies={() => setIsPoliciesOpen(true)}
-      />
+    <CartProvider>
+      <div className="h-screen bg-[#090909] text-[#FFFFFF] flex flex-col font-sans overflow-hidden">
+        {/* Top Global Navigation Bar */}
+        <Navbar
+          currentCustomer={currentCustomer}
+          onSelectCustomer={handleSelectCustomer}
+          onOpenPolicies={() => setIsPoliciesOpen(true)}
+        />
 
-      {/* Main Workspace Canvas */}
-      <main className="flex-1 overflow-hidden bg-[#090909] min-h-0 flex flex-col">
-        <Routes>
-          {/* Storefront Experience with Floating Support Widget */}
-          <Route
-            path="/"
-            element={
-              <NovaCartStorefront
-                currentCustomer={currentCustomer}
-                onSelectCustomer={handleSelectCustomer}
-              />
-            }
-          />
-          <Route
-            path="/store"
-            element={
-              <NovaCartStorefront
-                currentCustomer={currentCustomer}
-                onSelectCustomer={handleSelectCustomer}
-              />
-            }
-          />
+        {/* Main Workspace Canvas */}
+        <main className="flex-1 overflow-hidden bg-[#090909] min-h-0 flex flex-col">
+          <Routes>
+            {/* Storefront Experience with Floating Support Widget */}
+            <Route
+              path="/"
+              element={
+                <NovaCartStorefront
+                  currentCustomer={currentCustomer}
+                  onSelectCustomer={handleSelectCustomer}
+                />
+              }
+            />
+            <Route
+              path="/store"
+              element={
+                <NovaCartStorefront
+                  currentCustomer={currentCustomer}
+                  onSelectCustomer={handleSelectCustomer}
+                />
+              }
+            />
 
-          {/* Dedicated Customer Portal View (Preserved 100%) */}
-          <Route
-            path="/customer"
-            element={
-              <div className="h-full p-3 md:p-4 lg:p-5 flex flex-col min-h-0">
-                <div className="h-full max-w-[1150px] w-full mx-auto flex flex-col rounded-2xl bg-[#0C0C0C] border border-[#1E1E1E] shadow-2xl overflow-hidden">
-                  <CustomerPortal
-                    customer={currentCustomer}
-                    onSelectCustomer={handleSelectCustomer}
-                    compact={false}
-                  />
+            {/* Dedicated Customer Portal View (Preserved 100%) */}
+            <Route
+              path="/customer"
+              element={
+                <div className="h-full p-3 md:p-4 lg:p-5 flex flex-col min-h-0">
+                  <div className="h-full max-w-[1150px] w-full mx-auto flex flex-col rounded-2xl bg-[#0C0C0C] border border-[#1E1E1E] shadow-2xl overflow-hidden">
+                    <CustomerPortal
+                      customer={currentCustomer}
+                      onSelectCustomer={handleSelectCustomer}
+                      compact={false}
+                    />
+                  </div>
                 </div>
-              </div>
-            }
-          />
+              }
+            />
 
-          {/* Agent Dashboard View (Preserved 100%) */}
-          <Route
-            path="/agent"
-            element={
-              <div className="h-full p-3 md:p-4 lg:p-5 flex flex-col min-h-0">
-                <div className="h-full w-full rounded-2xl bg-[#0C0C0C] border border-[#1E1E1E] overflow-hidden shadow-2xl flex flex-col">
-                  <AgentDashboard
+            {/* Agent Dashboard View (Preserved 100%) */}
+            <Route
+              path="/agent"
+              element={
+                <div className="h-full p-3 md:p-4 lg:p-5 flex flex-col min-h-0">
+                  <div className="h-full w-full rounded-2xl bg-[#0C0C0C] border border-[#1E1E1E] overflow-hidden shadow-2xl flex flex-col">
+                    <AgentDashboard
+                      selectedTicketId={selectedTicketId}
+                      onSelectTicketId={handleSelectTicketId}
+                      onOpenPolicies={() => setIsPoliciesOpen(true)}
+                    />
+                  </div>
+                </div>
+              }
+            />
+
+            {/* Side-by-Side Split View (Preserved 100%) */}
+            <Route
+              path="/split"
+              element={
+                <div className="h-full p-3 md:p-4 lg:p-5 flex flex-col min-h-0">
+                  <SplitView
+                    currentCustomer={currentCustomer}
+                    onSelectCustomer={handleSelectCustomer}
                     selectedTicketId={selectedTicketId}
                     onSelectTicketId={handleSelectTicketId}
                     onOpenPolicies={() => setIsPoliciesOpen(true)}
                   />
                 </div>
-              </div>
-            }
-          />
+              }
+            />
 
-          {/* Side-by-Side Split View (Preserved 100%) */}
-          <Route
-            path="/split"
-            element={
-              <div className="h-full p-3 md:p-4 lg:p-5 flex flex-col min-h-0">
-                <SplitView
-                  currentCustomer={currentCustomer}
-                  onSelectCustomer={handleSelectCustomer}
-                  selectedTicketId={selectedTicketId}
-                  onSelectTicketId={handleSelectTicketId}
-                  onOpenPolicies={() => setIsPoliciesOpen(true)}
-                />
-              </div>
-            }
-          />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </main>
 
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </main>
-
-      {/* Policies Reference Drawer */}
-      <PolicyDrawer
-        isOpen={isPoliciesOpen}
-        onClose={() => setIsPoliciesOpen(false)}
-      />
-    </div>
+        {/* Policies Reference Drawer */}
+        <PolicyDrawer
+          isOpen={isPoliciesOpen}
+          onClose={() => setIsPoliciesOpen(false)}
+        />
+      </div>
+    </CartProvider>
   );
 }

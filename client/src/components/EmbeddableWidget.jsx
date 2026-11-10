@@ -178,13 +178,19 @@ export default function EmbeddableWidget({
     setInputText('');
 
     try {
-      await nexconnService.sendMessage(
+      const targetUserId = (ticketStatus === 'Human Agent Active' || humanRequested) ? 'agent_sarah' : 'novacart_support';
+      await nexconnService.sendMessage({
+        targetUserId,
         channelId,
-        raw,
-        'customer',
-        activeCustomer.name,
-        attachment
-      );
+        text: raw,
+        attachment,
+        metadata: {
+          ticketId,
+          orderId: activeCustomer.order?.orderId,
+          language: currentLang,
+          status: ticketStatus
+        }
+      });
       setAttachment(null);
 
       // Trigger AI reply if still AI Handling
@@ -220,12 +226,16 @@ export default function EmbeddableWidget({
     setTicketStatus('Human Requested');
     nexconnService.setTicketStatus(ticketId, 'Human Requested', true);
 
-    await nexconnService.sendMessage(
+    await nexconnService.sendMessage({
+      targetUserId: 'agent_sarah',
       channelId,
-      t.systemHandoff || "Customer requested human agent assistance.",
-      'system',
-      'Resolve AI System'
-    );
+      text: t.systemHandoff || "Customer requested human agent assistance.",
+      metadata: {
+        role: 'system',
+        isHandoff: true,
+        ticketId
+      }
+    });
 
     try {
       await requestHumanAssistance(ticketId, activeCustomer.name, 'Customer requested human agent via widget');

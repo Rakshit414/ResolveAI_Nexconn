@@ -42,6 +42,22 @@
 
   // Listen to postMessage to expand or collapse host iframe boundaries
   window.addEventListener('message', (event) => {
+    // 1. Strict event.source validation: message must originate exclusively from this iframe
+    if (event.source !== iframe.contentWindow) return;
+
+    // 2. Strict event.origin validation: verify message matches API origin
+    try {
+      const expectedHost = new URL(apiUrl).host;
+      const actualHost = new URL(event.origin).host;
+      if (expectedHost !== actualHost && !actualHost.includes('localhost') && !actualHost.includes('127.0.0.1')) {
+        console.warn('[Resolve AI Security] Rejected postMessage from mismatched origin:', event.origin);
+        return;
+      }
+    } catch (e) {
+      // Invalid URL origin
+      return;
+    }
+
     if (event.data?.type === 'RESOLVE_AI_WIDGET_RESIZE') {
       if (event.data.isOpen) {
         if (window.innerWidth < 640) {

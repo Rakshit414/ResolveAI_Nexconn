@@ -11,10 +11,20 @@ const DATA_FILE = path.resolve(__dirname, '../../data/tickets.json');
 class StorageService {
   constructor() {
     this.isPostgresMode = Boolean(process.env.DATABASE_URL);
+    if (process.env.NODE_ENV === 'production' && !this.isPostgresMode) {
+      console.error('[FATAL CONFIG] DATABASE_URL is strictly required in production mode. Fallback to file storage is disabled.');
+    }
   }
 
-  // --- ATOMIC JSON FALLBACK METHODS (For offline unit tests) ---
+  _assertStorageMode() {
+    if (process.env.NODE_ENV === 'production' && !this.isPostgresMode) {
+      throw new Error('Storage Error: PostgreSQL connection (DATABASE_URL) is strictly required in production mode. JSON storage fallback disabled.');
+    }
+  }
+
+  // --- ATOMIC JSON FALLBACK METHODS (Strictly for offline test suites) ---
   _readJsonFile() {
+    this._assertStorageMode();
     try {
       if (!fs.existsSync(DATA_FILE)) return [];
       const content = fs.readFileSync(DATA_FILE, 'utf8');
@@ -26,6 +36,7 @@ class StorageService {
   }
 
   _writeJsonFile(tickets) {
+    this._assertStorageMode();
     try {
       const tempFile = `${DATA_FILE}.tmp.${Date.now()}`;
       fs.writeFileSync(tempFile, JSON.stringify(tickets, null, 2), 'utf8');

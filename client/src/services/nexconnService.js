@@ -551,7 +551,25 @@ class NexconnManager {
    * 3. Message recorded in channel history exactly once.
    * 4. Dispatched ONLY to that channel's subscribers.
    */
-  async sendMessage({ targetUserId, channelId, text, metadata = {}, attachment = null }) {
+  async sendMessage(arg1, arg2, arg3, arg4, arg5) {
+    let targetUserId, channelId, text, metadata, attachment;
+    if (typeof arg1 === 'object' && arg1 !== null && !Array.isArray(arg1)) {
+      ({ targetUserId, channelId, text, metadata = {}, attachment = null } = arg1);
+    } else {
+      channelId = arg1;
+      text = arg2;
+      metadata = { senderRole: arg3, senderName: arg4 };
+      attachment = arg5 || null;
+    }
+
+    if (!targetUserId) {
+      if (this.currentUser?.role === 'agent') {
+        targetUserId = channelId ? channelId.replace('channel_NC', 'cust_').toLowerCase() : 'cust_aarav';
+      } else {
+        targetUserId = 'agent_sarah';
+      }
+    }
+
     const trimmedText = String(text || '').trim();
     if ((!trimmedText && !attachment) || !channelId) {
       console.warn('[Nexconn] Missing required params for sendMessage:', { channelId, text, attachment });

@@ -4,6 +4,43 @@ import { query } from '../db/pool.js';
 
 const router = express.Router();
 
+// In-memory sliding-window rate limiter for guest session provisioning
+const guestRateLimitMap = new Map();
+const GUEST_LIMIT_WINDOW_MS = 60 * 1000;
+const GUEST_LIMIT_MAX_REQUESTS = 10;
+
+export function isGuestRateLimited(clientIp) {
+  const now = Date.now();
+  const entry = guestRateLimitMap.get(clientIp) || { count: 0, windowStart: now };
+  if (now - entry.windowStart > GUEST_LIMIT_WINDOW_MS) {
+    entry.count = 1;
+    entry.windowStart = now;
+  } else {
+    entry.count += 1;
+  }
+  guestRateLimitMap.set(clientIp, entry);
+  return entry.count > GUEST_LIMIT_MAX_REQUESTS;
+}
+
+export function resetGuestRateLimit() {
+  guestRateLimitMap.clear();
+}
+
+export function validateBrandOrigin(brand, requestOrigin) {
+  if (!requestOrigin) {
+    // In production, reject empty origins for widget embeds
+    return process.env.NODE_ENV !== 'production';
+  }
+  const isLocalhost = requestOrigin.includes('localhost') || requestOrigin.includes('127.0.0.1');
+  if (process.env.NODE_ENV !== 'production' && isLocalhost) {
+    return true;
+  }
+  if (!brand.allowed_origins || brand.allowed_origins.length === 0) {
+    return false;
+  }
+  return brand.allowed_origins.some(allowed => requestOrigin.startsWith(allowed));
+}
+
 /**
  * GET /api/widget/config
  * Retrieves validated brand theme and configuration for the embeddable widget.
@@ -26,12 +63,8 @@ router.get('/config', async (req, res) => {
     const brand = brandRes.rows[0];
 
     // Origin validation
-    const isLocalhost = requestOrigin.includes('localhost') || requestOrigin.includes('127.0.0.1');
-    if (!isLocalhost && brand.allowed_origins?.length > 0) {
-      const isAllowed = brand.allowed_origins.some(allowed => requestOrigin.startsWith(allowed));
-      if (!isAllowed) {
-        return res.status(403).json({ success: false, error: 'Origin not authorized for brand widget' });
-      }
+    if (!validateBrandOrigin(brand, requestOrigin)) {
+      return res.status(403).json({ success: false, error: 'Origin not authorized for brand widget' });
     }
 
     // Load policies if available
@@ -101,13 +134,9 @@ router.post('/bootstrap', async (req, res) => {
     }
 
     const brand = brandRes.rows[0];
-    const isLocalhost = requestOrigin.includes('localhost') || requestOrigin.includes('127.0.0.1');
 
-    if (!isLocalhost && brand.allowed_origins?.length > 0) {
-      const isAllowed = brand.allowed_origins.some(allowed => requestOrigin.startsWith(allowed));
-      if (!isAllowed) {
-        return res.status(403).json({ error: 'Origin not authorized for brand widget' });
-      }
+    if (!validateBrandOrigin(brand, requestOrigin)) {
+      return res.status(403).json({ error: 'Origin not authorized for brand widget' });
     }
 
     // 2. Resolve customer (Guest or Authenticated)
@@ -129,6 +158,12 @@ router.post('/bootstrap', async (req, res) => {
     }
 
     if (!customer) {
+      // Rate limiting for anonymous guest visitors
+      const clientIp = req.ip || req.connection?.remoteAddress || '127.0.0.1';
+      if (isGuestRateLimited(clientIp)) {
+        return res.status(429).json({ error: 'Rate limit exceeded for guest session provisioning' });
+      }
+
       // Provision guest visitor
       const guestId = `cust_guest_${crypto.randomBytes(8).toString('hex')}`;
       const guestNexconnId = `cust_${brand.id}_${guestId}`;
@@ -195,6 +230,59 @@ router.post('/bootstrap', async (req, res) => {
   } catch (err) {
     console.error('[Widget Bootstrap Error]:', err.message);
     return res.status(500).json({ error: 'Widget session bootstrap failure' });
+  }
+});
+
+/**
+ * POST /api/widget/message
+ * Validates session token, origin, and customer-ticket ownership before accepting message.
+ */
+router.post('/message', async (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ success: false, error: 'Session bearer token required' });
+  }
+
+  const rawToken = authHeader.slice(7).trim();
+  const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+
+  try {
+    const sessionRes = await query(`
+      SELECT ws.id, ws.brand_id, ws.customer_id, ws.is_guest, ws.expires_at,
+             b.allowed_origins
+      FROM widget_sessions ws
+      JOIN brands b ON ws.brand_id = b.id
+      WHERE ws.session_token_hash = $1 AND ws.revoked_at IS NULL AND ws.expires_at > NOW()
+    `, [tokenHash]);
+
+    if (sessionRes.rows.length === 0) {
+      return res.status(403).json({ success: false, error: 'Invalid or expired widget session' });
+    }
+
+    const session = sessionRes.rows[0];
+    const requestOrigin = req.headers.origin || req.headers.referer || '';
+    if (!validateBrandOrigin(session, requestOrigin)) {
+      return res.status(403).json({ success: false, error: 'Origin not authorized for brand widget' });
+    }
+
+    const { ticketId, text } = req.body;
+    if (!ticketId || !text) {
+      return res.status(400).json({ success: false, error: 'ticketId and text required' });
+    }
+
+    // Enforce customer ownership of ticket
+    const ticketRes = await query(`
+      SELECT id FROM tickets WHERE id = $1 AND brand_id = $2 AND customer_id = $3
+    `, [ticketId, session.brand_id, session.customer_id]);
+
+    if (ticketRes.rows.length === 0) {
+      return res.status(403).json({ success: false, error: 'Ticket does not belong to authenticated session customer' });
+    }
+
+    return res.json({ success: true, message: 'Message validated and accepted' });
+  } catch (err) {
+    console.error('[Widget Message Error]:', err.message);
+    return res.status(500).json({ success: false, error: 'Internal message validation failure' });
   }
 });
 

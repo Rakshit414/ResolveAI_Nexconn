@@ -24,12 +24,18 @@ async function callGemini(prompt) {
     return null;
   }
   const genAI = new GoogleGenerativeAI(apiKey);
-  const primaryModel = process.env.GEMINI_MODEL || 'gemini-3.5-flash';
-  const modelsToTry = [primaryModel, 'gemini-3.5-flash-lite'];
+  const primaryModel = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+  const modelsToTry = [primaryModel, 'gemini-3.5-flash-lite', 'gemini-3.5-flash'];
 
   for (const modelName of modelsToTry) {
     try {
-      const model = genAI.getGenerativeModel({ model: modelName });
+      const model = genAI.getGenerativeModel({
+        model: modelName,
+        generationConfig: {
+          responseMimeType: 'application/json',
+          temperature: 0.2
+        }
+      });
       const result = await model.generateContent(prompt);
       const text = result.response.text();
       const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();

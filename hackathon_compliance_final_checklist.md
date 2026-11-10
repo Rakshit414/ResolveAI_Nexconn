@@ -50,7 +50,7 @@
 
 | Requirement | Implementation Detail | Status |
 |---|---|:---:|
-| **LLM Engine** | Gemini 1.5 Flash via `@google/generative-ai v0.24.0` | **COMPLIANT** |
+| **LLM Engine** | Gemini 3.8 / 3.5 Flash via `@google/generative-ai v0.24.0` with structured JSON mode | **COMPLIANT** |
 | **Order Grounding** | AI suggestions query actual order items, delivery dates, and return policies | **COMPLIANT** |
 | **Trilingual Support** | Native fluency in English, Hindi (हिन्दी), and Marathi (मराठी) with cultural honorifics | **COMPLIANT** |
 | **Agent Copilot** | 1-click suggested response generation with editable review and confidence indicators | **COMPLIANT** |
@@ -77,4 +77,4 @@
 | **Cloud Region** | Singapore (`sin` / `singapore`) for co-located <10ms latency to Nexconn Singapore API | **COMPLIANT** |
 | **Internal Networking** | PostgreSQL `DATABASE_URL` uses Render internal private network connection string | **COMPLIANT** |
 | **SPA Route Handling** | Server configured to serve static React bundle and SPA fallback across all routes | **COMPLIANT** |
-| **Pre-Deploy Migrations** | `preDeployCommand: node server/src/db/migrate.js` runs automatically on deployment | **COMPLIANT** |
+| **Startup Migrations** | Safe startup sequence checks connection, verifies checksums, and applies migrations before listening (100% Free Tier compatible, zero preDeployCommand dependency) | **COMPLIANT** |

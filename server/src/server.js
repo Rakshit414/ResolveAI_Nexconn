@@ -21,6 +21,7 @@ import webhooksRouter from './routes/webhooks.js';
 import widgetRouter from './routes/widget.js';
 import attachmentsRouter from './routes/attachments.js';
 import { healthCheck } from './db/pool.js';
+import { runMigration } from './db/migrate.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -125,18 +126,42 @@ app.use((err, req, res, next) => {
   res.status(500).json({ success: false, error: 'Internal Server Error', message: err.message });
 });
 
-app.listen(PORT, () => {
-  console.log(`=========================================`);
-  console.log(`Resolve AI Server running on port ${PORT}`);
-  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+async function startServer() {
   if (process.env.NODE_ENV === 'production') {
     if (!process.env.DATABASE_URL) {
       console.error(`[PRODUCTION FAIL-CLOSED WARNING] DATABASE_URL is NOT set.`);
       console.error(`[PRODUCTION FAIL-CLOSED WARNING] In-memory and JSON fallbacks are strictly prohibited. Readiness checks will fail.`);
     } else {
-      console.log(`[PRODUCTION] Connected to PostgreSQL via DATABASE_URL.`);
+      console.log(`[PRODUCTION STARTUP] Checking PostgreSQL connectivity and executing migrations...`);
+      try {
+        await runMigration();
+        console.log(`[PRODUCTION STARTUP] Migrations and database schema verified successfully.`);
+      } catch (err) {
+        console.error(`[PRODUCTION STARTUP FATAL ERROR] Failed to run database migrations:`, err.message);
+        process.exit(1);
+      }
+    }
+  } else {
+    // In dev / test environment, initialize database schema safely
+    try {
+      await runMigration();
+    } catch (e) {
+      console.warn(`[DEV STARTUP] Migration notice:`, e.message);
     }
   }
-  console.log(`Health check: http://localhost:${PORT}/api/health`);
-  console.log(`=========================================`);
-});
+
+  const server = app.listen(PORT, () => {
+    console.log(`=========================================`);
+    console.log(`Resolve AI Server running on port ${PORT}`);
+    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    if (process.env.NODE_ENV === 'production' && process.env.DATABASE_URL) {
+      console.log(`[PRODUCTION] Connected to PostgreSQL via DATABASE_URL.`);
+    }
+    console.log(`Health check: http://localhost:${PORT}/api/health`);
+    console.log(`=========================================`);
+  });
+
+  return server;
+}
+
+startServer();

@@ -101,7 +101,7 @@ Resolve AI leverages the official `@nexconn/chat v26.2.1` JavaScript SDK on both
 
 ## 4. AI Copilot & Customer Experience
 
-Resolve AI integrates Gemini 1.5 Flash via `@google/generative-ai` for lightning-fast copilot intelligence:
+Resolve AI integrates stable Gemini 3.8 / 3.5 Flash via `@google/generative-ai` with structured JSON mode (`responseMimeType: 'application/json'`) and automatic high-demand failover:
 
 1. **Contextual Order Grounding**:
    - When a customer asks about a delayed delivery or defective item, the AI inspects the customer's actual order items, tracking codes, and warranty status.

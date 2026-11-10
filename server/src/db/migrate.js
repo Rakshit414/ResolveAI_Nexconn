@@ -31,14 +31,22 @@ export async function runMigration({ dryRun = false } = {}) {
   // 1. Safety backup of tickets.json
   const backupPath = await backupTicketsJson();
 
-  // 2. Read SQL migration files
-  const schemaPath = path.join(__dirname, 'migrations/001_canonical_schema.sql');
-  const seedPath = path.join(__dirname, 'migrations/002_seed_demo_data.sql');
-  const schemaSql = fs.readFileSync(schemaPath, 'utf8');
-  const seedSql = fs.readFileSync(seedPath, 'utf8');
+  // 2. Read and register versioned SQL migration files
+  const migrationFiles = [
+    { version: '001_canonical_schema', filename: '001_canonical_schema.sql', isSeed: false },
+    { version: '002_seed_demo_data', filename: '002_seed_demo_data.sql', isSeed: true },
+    { version: '003_attachment_blob_storage', filename: '003_attachment_blob_storage.sql', isSeed: false },
+  ];
 
-  const schemaChecksum = getChecksum(schemaSql);
-  const seedChecksum = getChecksum(seedSql);
+  const migrationData = migrationFiles.map(m => {
+    const filePath = path.join(__dirname, 'migrations', m.filename);
+    const sql = fs.readFileSync(filePath, 'utf8');
+    return {
+      ...m,
+      sql,
+      checksum: getChecksum(sql)
+    };
+  });
 
   if (dryRun) {
     console.log('[Migrate] DRY RUN: Validating SQL script syntax and row counts');
@@ -48,10 +56,7 @@ export async function runMigration({ dryRun = false } = {}) {
       success: true,
       dryRun: true,
       backupPath,
-      schemaLength: schemaSql.length,
-      schemaChecksum,
-      seedLength: seedSql.length,
-      seedChecksum,
+      migrations: migrationData.map(m => ({ version: m.version, checksum: m.checksum, len: m.sql.length })),
       sourceTicketsCount: sourceTickets.length,
       customers: sourceTickets.map(t => t.customer.name),
       orders: sourceTickets.map(t => t.orderId),
@@ -59,7 +64,9 @@ export async function runMigration({ dryRun = false } = {}) {
     };
   }
 
-  const client = await getPool().connect();
+  // Pre-flight connectivity check
+  const pool = getPool();
+  const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
@@ -72,34 +79,36 @@ export async function runMigration({ dryRun = false } = {}) {
       );
     `);
 
-    // Check applied migrations
+    // Fetch applied migrations
     const appliedRes = await client.query('SELECT version, checksum FROM _schema_migrations');
     const appliedMap = new Map(appliedRes.rows.map(r => [r.version, r.checksum]));
 
-    // Apply 001_canonical_schema.sql if not applied
-    if (!appliedMap.has('001_canonical_schema')) {
-      console.log('[Migrate] Applying 001_canonical_schema.sql...');
-      await client.query(schemaSql);
-      await client.query(
-        'INSERT INTO _schema_migrations (version, checksum) VALUES ($1, $2)',
-        ['001_canonical_schema', schemaChecksum]
-      );
-    } else {
-      console.log('[Migrate] 001_canonical_schema.sql already applied, verifying schema...');
-      await client.query(schemaSql); // Safe idempotent re-run
-    }
+    // Iterate through versioned migrations in strict sequence
+    for (const m of migrationData) {
+      if (appliedMap.has(m.version)) {
+        const recordedChecksum = appliedMap.get(m.version);
+        if (recordedChecksum !== m.checksum) {
+          console.warn(`[Migrate Checksum Note] Migration ${m.version} checksum changed on disk: recorded=${recordedChecksum}, current=${m.checksum}`);
+        } else {
+          console.log(`[Migrate] ${m.version} checksum verified (${m.checksum.substring(0, 12)}...)`);
+        }
 
-    // Apply 002_seed_demo_data.sql if not applied
-    if (!appliedMap.has('002_seed_demo_data')) {
-      console.log('[Migrate] Applying 002_seed_demo_data.sql...');
-      await client.query(seedSql);
-      await client.query(
-        'INSERT INTO _schema_migrations (version, checksum) VALUES ($1, $2)',
-        ['002_seed_demo_data', seedChecksum]
-      );
-    } else {
-      console.log('[Migrate] 002_seed_demo_data.sql already applied, running idempotent seed...');
-      await client.query(seedSql); // Safe ON CONFLICT DO UPDATE/NOTHING
+        // If it's the seed migration, execute idempotent seed
+        if (m.isSeed) {
+          console.log(`[Migrate] ${m.version} already recorded, executing idempotent safe seed...`);
+          await client.query(m.sql);
+        } else {
+          console.log(`[Migrate] ${m.version} already applied, skipping DDL execution.`);
+        }
+      } else {
+        console.log(`[Migrate] Applying pending migration ${m.version} (${m.filename})...`);
+        await client.query(m.sql);
+        await client.query(
+          'INSERT INTO _schema_migrations (version, checksum) VALUES ($1, $2)',
+          [m.version, m.checksum]
+        );
+        console.log(`[Migrate] Successfully recorded ${m.version} in _schema_migrations`);
+      }
     }
 
     // 3. Post-migration verification

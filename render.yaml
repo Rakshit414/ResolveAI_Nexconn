@@ -1,22 +1,21 @@
-# Render Blueprint Specification for Resolve AI
-# Region: Singapore (sin / singapore) co-located for ultra-low latency with Nexconn Singapore API
+# Render Blueprint Specification for Resolve AI (100% Free Plan Deployment)
+# Co-located in Singapore (singapore) for <10ms round-trip latency to Nexconn Singapore API
 databases:
   - name: resolve-ai-db
     databaseName: resolve_ai
     user: resolve_ai_user
     region: singapore
-    plan: free # Eligible for upgrade to starter ($7/mo) upon authorization
+    plan: free # 100% Free Tier (1 GB storage, 256 MB RAM, 30-day initial window)
     ipAllowList: []
 
 services:
   - type: web
-    name: resolve-ai-app
+    name: resolve-ai-novacart
     runtime: node
     region: singapore
-    plan: free # Eligible for upgrade to starter ($7/mo) upon authorization
+    plan: free # 100% Free Tier (512 MB RAM, 0.1 CPU, zero monthly spend)
     branch: feature/checkpoint-c-storefront-widget
     buildCommand: npm --prefix server install && npm --prefix client install && npm --prefix client run build
-    preDeployCommand: node server/src/db/migrate.js
     startCommand: node server/src/server.js
     envVars:
       - key: NODE_ENV
@@ -34,10 +33,14 @@ services:
       - key: GEMINI_API_KEY
         sync: false
       - key: GEMINI_MODEL
-        value: gemini-1.5-flash
+        value: gemini-3.8-flash
       - key: SESSION_SECRET
         generateValue: true
       - key: CLIENT_URL
         value: https://resolve-ai-novacart.onrender.com
       - key: ALLOWED_ORIGINS
         value: https://resolve-ai-novacart.onrender.com
+      - key: WEBHOOK_URL
+        value: https://resolve-ai-novacart.onrender.com/api/webhooks/nexconn
+      - key: WIDGET_URL
+        value: https://resolve-ai-novacart.onrender.com/widget.js

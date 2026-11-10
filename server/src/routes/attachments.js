@@ -67,15 +67,19 @@ router.post('/upload', express.raw({ type: ['image/png', 'image/jpeg', 'image/we
     const storageKey = `brands/${brandId}/tickets/${ticketId}/${attachmentId}.${ext}`;
     const diskPath = path.join(UPLOAD_DIR, `${attachmentId}.${ext}`);
 
-    // Write file to durable disk store
-    fs.writeFileSync(diskPath, fileBuffer);
+    // Write file to local disk cache (best effort in ephemeral container)
+    try {
+      fs.writeFileSync(diskPath, fileBuffer);
+    } catch (e) {
+      console.warn('[Attachment Warning] Ephemeral local disk write skipped:', e.message);
+    }
 
-    // Record in database if ticket and customer provided
+    // Record in database with persistent BYTEA storage
     if (ticketId && customerId) {
       await query(`
-        INSERT INTO attachments (id, brand_id, ticket_id, customer_id, storage_key, file_name, mime_type, file_size_bytes)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-      `, [attachmentId, brandId, ticketId, customerId, storageKey, fileName, mimeType, fileBuffer.length]);
+        INSERT INTO attachments (id, brand_id, ticket_id, customer_id, storage_key, file_name, mime_type, file_size_bytes, file_data)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      `, [attachmentId, brandId, ticketId, customerId, storageKey, fileName, mimeType, fileBuffer.length, fileBuffer]);
     }
 
     return res.json({
@@ -104,7 +108,7 @@ router.get('/:id/download', async (req, res) => {
 
   try {
     const attRes = await query(`
-      SELECT id, file_name, mime_type, storage_key, deleted_at 
+      SELECT id, file_name, mime_type, storage_key, file_data, deleted_at 
       FROM attachments 
       WHERE id = $1
     `, [id]);
@@ -114,19 +118,26 @@ router.get('/:id/download', async (req, res) => {
     }
 
     const att = attRes.rows[0];
-    const ext = att.mime_type === 'image/png' ? 'png' : att.mime_type === 'image/webp' ? 'webp' : 'jpg';
-    const diskPath = path.join(UPLOAD_DIR, `${att.id}.${ext}`);
-
-    if (!fs.existsSync(diskPath)) {
-      return res.status(404).json({ error: 'File binary unavailable on storage volume.' });
-    }
 
     res.setHeader('Content-Type', att.mime_type);
     res.setHeader('Content-Disposition', `inline; filename="${att.file_name}"`);
     res.setHeader('Content-Security-Policy', "default-src 'none'");
 
-    const fileStream = fs.createReadStream(diskPath);
-    fileStream.pipe(res);
+    // 1. If stored persistently in PostgreSQL BYTEA, serve directly from database
+    if (att.file_data) {
+      return res.send(att.file_data);
+    }
+
+    // 2. Otherwise fallback to local disk if available
+    const ext = att.mime_type === 'image/png' ? 'png' : att.mime_type === 'image/webp' ? 'webp' : 'jpg';
+    const diskPath = path.join(UPLOAD_DIR, `${att.id}.${ext}`);
+
+    if (fs.existsSync(diskPath)) {
+      const fileStream = fs.createReadStream(diskPath);
+      return fileStream.pipe(res);
+    }
+
+    return res.status(404).json({ error: 'File binary unavailable on storage volume.' });
   } catch (err) {
     console.error('[Attachment Download Error]:', err.message);
     return res.status(500).json({ error: 'Attachment retrieval failure.' });

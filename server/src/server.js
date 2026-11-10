@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -53,6 +54,10 @@ app.use('/api/attachments', attachmentsRouter);
 // Standalone Embed Widget Loader Script for Host Integration
 app.get('/widget.js', (req, res) => {
   res.setHeader('Content-Type', 'application/javascript');
+  const widgetDist = path.resolve(__dirname, '../../client/dist/widget.js');
+  if (fs.existsSync(widgetDist)) {
+    return res.sendFile(widgetDist);
+  }
   res.sendFile(path.resolve(__dirname, '../public/widget.js'));
 });
 
@@ -85,12 +90,26 @@ app.get('/api/health', async (req, res) => {
   });
 });
 
-// Root welcome
-app.get('/', (req, res) => {
-  res.json({
-    message: 'Resolve AI API is running. Access customer and agent endpoints under /api.',
+// Static client assets and SPA fallback in production
+const clientDistPath = path.resolve(__dirname, '../../client/dist');
+if (fs.existsSync(clientDistPath)) {
+  app.use(express.static(clientDistPath));
+
+  // SPA fallback for all frontend routes (/store, /customer, /agent, /split, /widget-frame, etc.)
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api/')) {
+      return next();
+    }
+    res.sendFile(path.join(clientDistPath, 'index.html'));
   });
-});
+} else {
+  // Root welcome in standalone dev API mode
+  app.get('/', (req, res) => {
+    res.json({
+      message: 'Resolve AI API is running. Access customer and agent endpoints under /api.',
+    });
+  });
+}
 
 // 404 handler
 app.use((req, res) => {

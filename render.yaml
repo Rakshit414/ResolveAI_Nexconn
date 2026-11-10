@@ -1,0 +1,43 @@
+# Render Blueprint Specification for Resolve AI
+# Region: Singapore (sin / singapore) co-located for ultra-low latency with Nexconn Singapore API
+databases:
+  - name: resolve-ai-db
+    databaseName: resolve_ai
+    user: resolve_ai_user
+    region: singapore
+    plan: free # Eligible for upgrade to starter ($7/mo) upon authorization
+    ipAllowList: []
+
+services:
+  - type: web
+    name: resolve-ai-app
+    runtime: node
+    region: singapore
+    plan: free # Eligible for upgrade to starter ($7/mo) upon authorization
+    branch: feature/checkpoint-c-storefront-widget
+    buildCommand: npm --prefix server install && npm --prefix client install && npm --prefix client run build
+    preDeployCommand: node server/src/db/migrate.js
+    startCommand: node server/src/server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: resolve-ai-db
+          property: connectionString
+      - key: NEXCONN_APP_KEY
+        sync: false
+      - key: NEXCONN_APP_SECRET
+        sync: false
+      - key: NEXCONN_API_URL
+        value: https://api.sg-light-api.com
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-1.5-flash
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: CLIENT_URL
+        value: https://resolve-ai-novacart.onrender.com
+      - key: ALLOWED_ORIGINS
+        value: https://resolve-ai-novacart.onrender.com

@@ -9,6 +9,7 @@
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "build:client": "cd client && npm run build",
     "build": "cd client && npm run build",
+    "db:migrate": "node server/src/db/migrate.js",
     "start": "cd server && npm start"
   },
   "keywords": [

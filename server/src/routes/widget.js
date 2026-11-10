@@ -26,19 +26,60 @@ export function resetGuestRateLimit() {
   guestRateLimitMap.clear();
 }
 
+/**
+ * Normalizes an origin or URL string into an exact origin (scheme + domain + port).
+ * Rejects non-http(s) protocols, malformed URLs, and relative paths.
+ */
+export function normalizeOrigin(input) {
+  if (!input || typeof input !== 'string') return null;
+  try {
+    const url = new URL(input);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+    return url.origin.toLowerCase();
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * Validates request origin against the brand's exact allowed origin set.
+ * Strictly prevents prefix-confusion, unexpected ports, and strips localhost in production.
+ */
 export function validateBrandOrigin(brand, requestOrigin) {
   if (!requestOrigin) {
     // In production, reject empty origins for widget embeds
     return process.env.NODE_ENV !== 'production';
   }
-  const isLocalhost = requestOrigin.includes('localhost') || requestOrigin.includes('127.0.0.1');
-  if (process.env.NODE_ENV !== 'production' && isLocalhost) {
-    return true;
-  }
-  if (!brand.allowed_origins || brand.allowed_origins.length === 0) {
+
+  const normalizedRequest = normalizeOrigin(requestOrigin);
+  if (!normalizedRequest) {
     return false;
   }
-  return brand.allowed_origins.some(allowed => requestOrigin.startsWith(allowed));
+
+  const isProduction = process.env.NODE_ENV === 'production';
+  const allowedSet = new Set();
+
+  if (Array.isArray(brand.allowed_origins)) {
+    for (const origin of brand.allowed_origins) {
+      const norm = normalizeOrigin(origin);
+      if (norm) {
+        // Strip localhost and 127.0.0.1 origins in production
+        if (isProduction && (norm.includes('localhost') || norm.includes('127.0.0.1'))) {
+          continue;
+        }
+        allowedSet.add(norm);
+      }
+    }
+  }
+
+  if (!isProduction) {
+    allowedSet.add('http://localhost:5173');
+    allowedSet.add('http://localhost:5000');
+    allowedSet.add('http://127.0.0.1:5173');
+    allowedSet.add('http://127.0.0.1:5000');
+  }
+
+  return allowedSet.has(normalizedRequest);
 }
 
 /**

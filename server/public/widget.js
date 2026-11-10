@@ -45,16 +45,25 @@
     // 1. Strict event.source validation: message must originate exclusively from this iframe
     if (event.source !== iframe.contentWindow) return;
 
-    // 2. Strict event.origin validation: verify message matches API origin
+    // 2. Strict event.origin validation: verify message matches exact API origin
     try {
-      const expectedHost = new URL(apiUrl).host;
-      const actualHost = new URL(event.origin).host;
-      if (expectedHost !== actualHost && !actualHost.includes('localhost') && !actualHost.includes('127.0.0.1')) {
-        console.warn('[Resolve AI Security] Rejected postMessage from mismatched origin:', event.origin);
+      if (!event.origin || event.origin === 'null') return;
+      const parsedActual = new URL(event.origin);
+      if (parsedActual.protocol !== 'http:' && parsedActual.protocol !== 'https:') return;
+      const actualOrigin = parsedActual.origin.toLowerCase();
+
+      const parsedExpected = new URL(apiUrl);
+      const expectedOrigin = parsedExpected.origin.toLowerCase();
+
+      const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      const isAllowed = actualOrigin === expectedOrigin || 
+        (isDev && (actualOrigin === 'http://localhost:5173' || actualOrigin === 'http://127.0.0.1:5173' || actualOrigin === 'http://localhost:5000' || actualOrigin === 'http://127.0.0.1:5000'));
+
+      if (!isAllowed) {
+        console.warn('[Resolve AI Security] Rejected postMessage from untrusted origin:', event.origin);
         return;
       }
     } catch (e) {
-      // Invalid URL origin
       return;
     }
 

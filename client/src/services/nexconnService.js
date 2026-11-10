@@ -688,4 +688,7 @@ class NexconnManager {
 }
 
 export const nexconnService = new NexconnManager();
+if (typeof window !== 'undefined') {
+  window.__nexconnService = nexconnService;
+}
 export default nexconnService;

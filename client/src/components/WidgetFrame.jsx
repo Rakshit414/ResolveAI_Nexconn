@@ -39,17 +39,36 @@ export default function WidgetFrame() {
         return;
       }
 
-      // 2. Validate event.origin: check against allowed domain whitelist
-      const trustedOrigins = [
-        window.location.origin,
-        'http://localhost:5173',
-        'http://127.0.0.1:5173',
-        'http://localhost:5000',
-        'http://127.0.0.1:5000',
-        'https://resolve-ai-novacart.onrender.com'
-      ];
-      const isTrusted = trustedOrigins.some(o => event.origin.startsWith(o)) || event.origin === 'null';
-      if (!isTrusted) {
+      // 2. Validate event.origin: normalize and verify against exact allowed origin Set
+      let normalizedOrigin = null;
+      try {
+        if (event.origin && event.origin !== 'null') {
+          const parsed = new URL(event.origin);
+          if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+            normalizedOrigin = parsed.origin.toLowerCase();
+          }
+        }
+      } catch (e) {
+        normalizedOrigin = null;
+      }
+
+      const isProd = import.meta.env.PROD;
+      const allowedOrigins = new Set();
+
+      // Current host origin
+      if (window.location.origin) {
+        allowedOrigins.add(window.location.origin.toLowerCase());
+      }
+      allowedOrigins.add('https://resolve-ai-novacart.onrender.com');
+
+      if (!isProd) {
+        allowedOrigins.add('http://localhost:5173');
+        allowedOrigins.add('http://127.0.0.1:5173');
+        allowedOrigins.add('http://localhost:5000');
+        allowedOrigins.add('http://127.0.0.1:5000');
+      }
+
+      if (!normalizedOrigin || !allowedOrigins.has(normalizedOrigin)) {
         console.warn('[Resolve AI Security] Rejected postMessage from untrusted origin:', event.origin);
         return;
       }

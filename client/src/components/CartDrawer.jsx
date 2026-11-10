@@ -122,16 +122,17 @@ export default function CartDrawer({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden animate-fadeIn" role="dialog" aria-modal="true" aria-labelledby="cart-heading">
+    <div id="cart-drawer-root" className="fixed inset-0 z-50 overflow-hidden animate-fadeIn" role="dialog" aria-modal="true" aria-labelledby="cart-heading">
       {/* 1. Backdrop Overlay (Click to close) */}
       <div 
+        id="cart-backdrop"
         onClick={onClose}
         className="fixed inset-0 bg-black/80 backdrop-blur-sm transition-opacity"
       />
 
       {/* 2. Slide-over Container (Right on desktop, full-screen on mobile) */}
       <div className="fixed inset-y-0 right-0 max-w-full flex pl-0 sm:pl-10">
-        <div className="w-screen sm:w-[460px] max-w-full bg-[#0D0D0D] border-l border-[#222222] shadow-2xl flex flex-col justify-between text-[#FFFFFF] animate-slideInRight">
+        <div id="cart-drawer" className="w-screen sm:w-[460px] max-w-full bg-[#0D0D0D] border-l border-[#222222] shadow-2xl flex flex-col justify-between text-[#FFFFFF] animate-slideInRight">
           
           {/* =================================================================
               TOP DRAWER HEADER
@@ -217,7 +218,11 @@ export default function CartDrawer({
                 ) : (
                   /* Active Cart Items */
                   cart.map((item) => (
-                    <div key={item.variantId || `${item.id}_${item.variant}`} className="py-4 first:pt-0 last:pb-0 flex items-start space-x-3.5">
+                    <div 
+                      key={item.variantId || `${item.id}_${item.variant}`} 
+                      id={`cart-item-${item.variantId || item.id}`}
+                      className="py-4 first:pt-0 last:pb-0 flex items-start space-x-3.5"
+                    >
                       {/* Product Thumbnail */}
                       <img
                         src={item.image}

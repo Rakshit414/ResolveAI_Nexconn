@@ -126,7 +126,17 @@ Resolve AI integrates stable Gemini 3.8 / 3.5 Flash via `@google/generative-ai` 
 
 ---
 
-## 6. Official Submission Metadata
+## 6. 30-Day Permanent Cloud Migration Strategy (Oracle Cloud Always Free)
+
+Resolve AI is deployed on Render Free Tier for an initial 30-day hackathon evaluation window. Because Render Free PostgreSQL terminates 30 days post-creation, a complete full-stack migration strategy is prepared:
+- **Tenancy Home Region Alignment**: OCI Always Free compute and databases are strictly provisioned in the tenancy's confirmed Home Region: **India West (Mumbai / `ap-mumbai-1`)**.
+- **Co-located Full Stack Migration**: To eliminate cross-region latency (~60-80ms per query between Singapore and Mumbai), the entire stack (Node.js 24 + PostgreSQL 16) migrates to Mumbai as a co-located unit.
+- **Durable Off-Site Backups**: Database backups are exported externally using `server/scripts/backupAndRestore.js` or `pg_dump` outside Render's ephemeral filesystem.
+- **Key Milestones**: Creation: 2026-11-10 | Day 20 Review: 2026-11-30 | Day 25 Cutoff: 2026-12-05 | Day 30 Expiry: 2026-12-10. Detailed runbook documented in [`docs/ORACLE_CLOUD_MIGRATION_GUIDE.md`](docs/ORACLE_CLOUD_MIGRATION_GUIDE.md).
+
+---
+
+## 7. Official Submission Metadata
 
 - **Track:** Marketplace & Support
 - **Application Name:** Resolve AI

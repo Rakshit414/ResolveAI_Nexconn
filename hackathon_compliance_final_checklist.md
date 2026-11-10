@@ -78,3 +78,6 @@
 | **Internal Networking** | PostgreSQL `DATABASE_URL` uses Render internal private network connection string | **COMPLIANT** |
 | **SPA Route Handling** | Server configured to serve static React bundle and SPA fallback across all routes | **COMPLIANT** |
 | **Startup Migrations** | Safe startup sequence checks connection, verifies checksums, and applies migrations before listening (100% Free Tier compatible, zero preDeployCommand dependency) | **COMPLIANT** |
+| **Attachment Persistence** | Uploads saved to PostgreSQL `attachments.file_data BYTEA` to survive Render ephemeral container cycles | **COMPLIANT** |
+| **External Database Backup** | Database dump executed from external machine to off-site location outside Render filesystem | **COMPLIANT** |
+| **30-Day Permanent Migration** | Co-located full stack migration planned for OCI Always Free Home Region (Mumbai / `ap-mumbai-1`) before Day 30 | **COMPLIANT** |

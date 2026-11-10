@@ -6,6 +6,18 @@
 
 ---
 
+> [!WARNING]
+> ### 🚨 30-Day Cloud Database Expiry & Permanent Migration Notice
+> **Temporary Environment:** Render Free Managed PostgreSQL (`resolve-ai-db`, Singapore `singapore`)  
+> **Database Creation Timestamp:** `2026-11-10T18:52:00+05:30`  
+> **Render Hard Deletion Timestamp:** **`2026-12-10T18:52:00+05:30`** (Day 30 auto-termination)  
+> **Emergency Cutoff Deadline:** **`2026-12-05T18:52:00+05:30`** (Day 25 zero-traffic transition)  
+> **Mandatory Review Checkpoint:** **`2026-11-30T18:52:00+05:30`** (Day 20 off-site export & test restore)  
+> **Permanent Target Host:** Oracle Cloud Always Free (Home Region: India West - Mumbai / `ap-mumbai-1`)  
+> **Migration Runbook:** Follow [`docs/ORACLE_CLOUD_MIGRATION_GUIDE.md`](docs/ORACLE_CLOUD_MIGRATION_GUIDE.md) for full-stack migration procedures.
+
+---
+
 ## 🌟 Overview
 
 **Resolve AI** is an intelligent, full-stack customer support workspace engineered to solve modern retail & marketplace support bottlenecks:

@@ -7,10 +7,10 @@
     "dev:server": "cd server && npm run dev",
     "dev:client": "cd client && npm run dev",
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
-    "build:client": "cd client && npm run build",
-    "build": "cd client && npm run build",
+    "build:client": "npm --prefix client run build",
+    "build": "npm --prefix server install && npm --prefix client install && npm --prefix client run build",
     "db:migrate": "node server/src/db/migrate.js",
-    "start": "cd server && npm start"
+    "start": "node server/src/server.js"
   },
   "keywords": [
     "nexconn",

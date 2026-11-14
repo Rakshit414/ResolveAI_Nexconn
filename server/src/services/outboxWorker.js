@@ -14,7 +14,7 @@ export async function processNextOutboxJob() {
   // Acquire next available job with a 30-second lease
   const acquireSql = `
     UPDATE outbox_messages
-    SET 
+    SET
       dispatch_status = 'dispatching',
       worker_id = $1,
       locked_at = NOW(),
@@ -41,17 +41,17 @@ export async function processNextOutboxJob() {
   try {
     // 1. Authoritative participant validation
     const mappingRes = await query(
-      `SELECT customer_user_id, support_identity 
-       FROM conversation_mappings 
+      `SELECT customer_user_id, support_identity
+       FROM conversation_mappings
        WHERE brand_id = $1 AND id = $2`,
       [job.brand_id, job.conversation_mapping_id]
     );
 
     if (mappingRes.rows.length === 0) {
       await query(
-        `UPDATE outbox_messages 
-         SET dispatch_status = 'failed', 
-             last_error = 'Authoritative conversation mapping not found' 
+        `UPDATE outbox_messages
+         SET dispatch_status = 'failed',
+             last_error = 'Authoritative conversation mapping not found'
          WHERE id = $1`,
         [job.id]
       );
@@ -63,9 +63,9 @@ export async function processNextOutboxJob() {
     // Strictly validate sender and target match authoritative mapping
     if (job.sender_user_id !== mapping.support_identity || job.target_user_id !== mapping.customer_user_id) {
       await query(
-        `UPDATE outbox_messages 
-         SET dispatch_status = 'failed', 
-             last_error = $1 
+        `UPDATE outbox_messages
+         SET dispatch_status = 'failed',
+             last_error = $1
          WHERE id = $2`,
         [`Participant mismatch: outbox (${job.sender_user_id} -> ${job.target_user_id}) does not match conversation (${mapping.support_identity} -> ${mapping.customer_user_id})`, job.id]
       );
@@ -103,7 +103,7 @@ export async function processNextOutboxJob() {
       // Append to message_archive
       await query(
         `INSERT INTO message_archive (
-           id, brand_id, ticket_id, nexconn_message_id, sender_user_id, target_user_id, 
+           id, brand_id, ticket_id, nexconn_message_id, sender_user_id, target_user_id,
            sender_role, sender_name, message_type, message_text, content_payload
          )
          VALUES ($1, $2, $3, $4, $5, $6, 'agent', 'Support Agent', $7, $8, $9)
@@ -141,9 +141,9 @@ export async function processNextOutboxJob() {
     const maxAttempts = job.max_attempts || 5;
     if (job.attempt_count >= maxAttempts) {
       await query(
-        `UPDATE outbox_messages 
-         SET dispatch_status = 'failed', 
-             last_error = $1 
+        `UPDATE outbox_messages
+         SET dispatch_status = 'failed',
+             last_error = $1
          WHERE id = $2`,
         [JSON.stringify(dispatchRes.error || 'Max attempts reached'), job.id]
       );
@@ -165,9 +165,9 @@ export async function processNextOutboxJob() {
   } catch (err) {
     console.error(`[Outbox] Unexpected exception on job ${job.id}:`, err.message);
     await query(
-      `UPDATE outbox_messages 
-       SET dispatch_status = 'failed', 
-           last_error = $1 
+      `UPDATE outbox_messages
+       SET dispatch_status = 'failed',
+           last_error = $1
        WHERE id = $2`,
       [err.message, job.id]
     );
@@ -176,7 +176,10 @@ export async function processNextOutboxJob() {
 }
 
 /**
- * Reconcile UNCERTAIN outbox jobs by inspecting webhook receipts and message archive
+ * Reconcile UNCERTAIN outbox jobs by inspecting webhook receipts and message archive.
+ * STRICT SAFETY RULE: Never blindly resend or re-queue an uncertain job to pending.
+ * Only mark dispatched when delivery evidence is found.
+ * If no evidence exists, preserve status as 'uncertain' to prevent duplicate sends.
  */
 export async function reconcileUncertainJobs() {
   const uncertainJobs = await query(`
@@ -189,12 +192,13 @@ export async function reconcileUncertainJobs() {
   const reconciled = [];
 
   for (const job of uncertainJobs.rows) {
-    // Check if webhook_receipts or message_archive already captured this outboxId
+    // 1. Check if webhook_receipts already captured this outboxId or dedupe_key
     const checkReceipt = await query(`
       SELECT event_id, raw_payload FROM webhook_receipts
-      WHERE raw_payload::text LIKE $1
+      WHERE raw_payload::text LIKE $1 OR raw_payload::text LIKE $2
+      ORDER BY timestamp_ms DESC
       LIMIT 1
-    `, [`%${job.id}%`]);
+    `, [`%${job.id}%`, `%${job.dedupe_key}%`]);
 
     if (checkReceipt.rows.length > 0) {
       const observedMsgId = checkReceipt.rows[0].event_id;
@@ -211,24 +215,57 @@ export async function reconcileUncertainJobs() {
       continue;
     }
 
-    // If no evidence after 2 minutes, return to pending retry
-    const jobAgeRes = await query(`
-      SELECT EXTRACT(EPOCH FROM (NOW() - locked_at)) AS age_seconds 
-      FROM outbox_messages WHERE id = $1
-    `, [job.id]);
-    
-    const ageSeconds = jobAgeRes.rows[0]?.age_seconds || 0;
-    if (ageSeconds > 120 && job.attempt_count < (job.max_attempts || 5)) {
-      console.log(`[Outbox Reconcile] Job ${job.id} had no evidence after 2m; re-queuing for retry`);
+    // 2. Check if message_archive already has this message recorded
+    const checkArchive = await query(`
+      SELECT nexconn_message_id FROM message_archive
+      WHERE brand_id = $1 AND (content_payload::text LIKE $2 OR id = $3)
+      LIMIT 1
+    `, [job.brand_id, `%${job.id}%`, `arch_${job.id}`]);
+
+    if (checkArchive.rows.length > 0 && checkArchive.rows[0].nexconn_message_id) {
+      const confirmedMsgId = checkArchive.rows[0].nexconn_message_id;
+      console.log(`[Outbox Reconcile] Job ${job.id} confirmed delivered via message_archive ${confirmedMsgId}`);
       await query(`
         UPDATE outbox_messages
-        SET dispatch_status = 'pending',
-            next_attempt_at = NOW(),
-            last_error = 'Reconciled unconfirmed timeout; re-attempting'
+        SET dispatch_status = 'dispatched',
+            nexconn_message_id = $1,
+            dispatched_at = NOW(),
+            last_error = 'Reconciled via message archive confirmation'
+        WHERE id = $2
+      `, [confirmedMsgId, job.id]);
+      reconciled.push({ id: job.id, outcome: 'reconciled_dispatched', messageId: confirmedMsgId });
+      continue;
+    }
+
+    // 3. Check if webhook receipts confirm explicit provider rejection / non-delivery
+    const checkRejection = await query(`
+      SELECT event_id, raw_payload FROM webhook_receipts
+      WHERE (raw_payload::text LIKE $1 OR raw_payload::text LIKE $2)
+        AND (raw_payload::text LIKE '%undelivered%' OR raw_payload::text LIKE '%failed%' OR raw_payload::text LIKE '%rejected%')
+      LIMIT 1
+    `, [`%${job.id}%`, `%${job.dedupe_key}%`]);
+
+    if (checkRejection.rows.length > 0) {
+      console.log(`[Outbox Reconcile] Job ${job.id} non-delivery established via failure webhook`);
+      await query(`
+        UPDATE outbox_messages
+        SET dispatch_status = 'failed',
+            last_error = 'Provider established non-delivery via webhook'
         WHERE id = $1
       `, [job.id]);
-      reconciled.push({ id: job.id, outcome: 'requeued_retry' });
+      reconciled.push({ id: job.id, outcome: 'established_non_delivery' });
+      continue;
     }
+
+    // 4. PRESERVE UNRESOLVED: If unconfirmed, PRESERVE in 'uncertain' status!
+    // Never blindly re-queue to 'pending', as doing so risks duplicate delivery.
+    console.log(`[Outbox Reconcile] Job ${job.id} remains UNCERTAIN; awaiting webhook confirmation. Blind retry prevented.`);
+    await query(`
+      UPDATE outbox_messages
+      SET last_error = 'Preserved in uncertain status: awaiting delivery webhook or status lookup; duplicate dispatch prevented'
+      WHERE id = $1
+    `, [job.id]);
+    reconciled.push({ id: job.id, outcome: 'preserved_uncertain' });
   }
 
   return reconciled;

@@ -9,8 +9,11 @@ const __dirname = path.dirname(__filename);
 const DATA_FILE = path.resolve(__dirname, '../../data/tickets.json');
 
 class StorageService {
+  get isPostgresMode() {
+    return Boolean(process.env.DATABASE_URL);
+  }
+
   constructor() {
-    this.isPostgresMode = Boolean(process.env.DATABASE_URL);
     if (process.env.NODE_ENV === 'production' && !this.isPostgresMode) {
       console.error('[FATAL CONFIG] DATABASE_URL is strictly required in production mode. Fallback to file storage is disabled.');
     }
@@ -53,7 +56,7 @@ class StorageService {
   async getTickets({ brandId = 'brand_novacart', status = null } = {}) {
     if (this.isPostgresMode) {
       let sql = `
-        SELECT 
+        SELECT
           t.id, t.brand_id AS "brandId", t.order_id AS "orderId",
           o.order_number AS "orderNumber",
           t.category, t.priority, t.sentiment, t.status,
@@ -129,8 +132,8 @@ class StorageService {
       // 1. Check idempotency table if key provided
       if (idempotencyKey) {
         const idemRes = await query(
-          `SELECT response_code, response_body, request_hash 
-           FROM idempotency_keys 
+          `SELECT response_code, response_body, request_hash
+           FROM idempotency_keys
            WHERE brand_id = $1 AND idempotency_key = $2`,
           [brandId, idempotencyKey]
         );
@@ -149,7 +152,7 @@ class StorageService {
       // 2. Resolve or create customer
       let customerId = customer?.id;
       const nexconnUserId = customer?.nexconnUserId || customerId || `cust_${brandId}_${Date.now()}`;
-      
+
       const custRes = await query(
         `INSERT INTO customers (id, brand_id, name, email, avatar_url, nexconn_user_id, is_guest)
          VALUES ($1, $2, $3, $4, $5, $6, $7)

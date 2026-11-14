@@ -1,22 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  MessageSquare, 
-  X, 
-  Send, 
-  Paperclip, 
-  ChevronDown, 
-  ChevronUp, 
-  Sparkles, 
-  ShieldCheck, 
-  User, 
-  PackageSearch, 
-  RotateCcw, 
-  AlertCircle, 
-  MessageCircleQuestion, 
+import {
+  MessageSquare,
+  X,
+  Send,
+  Paperclip,
+  ChevronDown,
+  ChevronUp,
+  Sparkles,
+  ShieldCheck,
+  User,
+  PackageSearch,
+  RotateCcw,
+  AlertCircle,
+  MessageCircleQuestion,
   Download,
   ArrowDownToLine,
   Loader2,
-  Globe, 
+  Globe,
   ExternalLink,
   Minimize2,
   Maximize2,
@@ -27,11 +27,11 @@ import {
 import { DEMO_CUSTOMERS } from '../data/demoData';
 import { requestHumanAssistance, getTicket, updateTicket } from '../services/api';
 import nexconnService from '../services/nexconnService';
-import { 
-  TRANSLATIONS, 
-  SUPPORTED_LANGUAGES, 
+import {
+  TRANSLATIONS,
+  SUPPORTED_LANGUAGES,
   getPersonalizedGreeting,
-  getAssistantIntroMessage 
+  getAssistantIntroMessage
 } from '../utils/translations';
 
 export default function EmbeddableWidget({
@@ -414,7 +414,7 @@ export default function EmbeddableWidget({
     return (
       <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
         {/* Teaser pill banner */}
-        <div 
+        <div
           onClick={onToggle}
           className="mb-2.5 px-3.5 py-1.5 rounded-full bg-[#121212] border border-[#222222] shadow-2xl flex items-center space-x-2 text-xs text-[#FFFFFF] hover:border-[#7CFF00]/50 transition-all cursor-pointer group animate-fade-in"
         >
@@ -443,23 +443,23 @@ export default function EmbeddableWidget({
 
   // Active Support Widget Container
   return (
-    <div 
+    <div
       className={`flex flex-col bg-[#0C0C0C] text-[#FFFFFF] border border-[#222222] shadow-2xl transition-all duration-300 overflow-hidden ${
-        isStandalone 
-          ? 'w-full h-full rounded-none' 
+        isStandalone
+          ? 'w-full h-full rounded-none'
           : `fixed bottom-6 right-6 z-50 rounded-2xl ${
-              isExpanded 
-                ? 'w-[95vw] md:w-[680px] h-[85vh] max-h-[780px]' 
+              isExpanded
+                ? 'w-[95vw] md:w-[680px] h-[85vh] max-h-[780px]'
                 : 'w-[92vw] sm:w-[410px] h-[640px] max-h-[90vh]'
             }`
       }`}
     >
       {/* 1. Brand Header */}
-      <div 
+      <div
         className="px-4 py-3 border-b border-[#1E1E1E] bg-[#121212] flex items-center justify-between shrink-0"
       >
         <div className="flex items-center space-x-3 min-w-0">
-          <div 
+          <div
             style={{ backgroundColor: effectiveTheme.primaryColor, color: effectiveTheme.primaryTextColor }}
             className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-sm"
           >
@@ -484,7 +484,7 @@ export default function EmbeddableWidget({
         <div className="flex items-center space-x-1 shrink-0">
           {/* Language Switcher */}
           <div className="relative group">
-            <button 
+            <button
               className="p-1.5 rounded-lg hover:bg-[#1A1A1A] text-[#888888] hover:text-[#FFFFFF] transition-colors text-xs flex items-center space-x-1"
               title="Change language"
             >
@@ -543,9 +543,9 @@ export default function EmbeddableWidget({
       <div className="px-3.5 py-2.5 bg-[#141414] border-b border-[#1E1E1E] shrink-0">
         <div className="flex items-center justify-between text-xs">
           <div className="flex items-center space-x-2 truncate">
-            <img 
-              src={activeCustomer?.avatar || DEMO_CUSTOMERS[0].avatar} 
-              alt={activeCustomer?.name} 
+            <img
+              src={activeCustomer?.avatar || DEMO_CUSTOMERS[0].avatar}
+              alt={activeCustomer?.name}
               className="w-5 h-5 rounded-full border border-[#333333] shrink-0 object-cover"
             />
             <span className="font-semibold text-[#FFFFFF] truncate">
@@ -571,9 +571,9 @@ export default function EmbeddableWidget({
         {showOrderDrawer && activeCustomer?.order && (
           <div className="mt-2.5 pt-2.5 border-t border-[#222222] bg-[#0E0E0E] p-2.5 rounded-lg border border-[#1A1A1A] text-xs space-y-1.5 animate-fade-in">
             <div className="flex items-center space-x-2.5">
-              <img 
-                src={activeCustomer.order.image} 
-                alt={activeCustomer.order.product} 
+              <img
+                src={activeCustomer.order.image}
+                alt={activeCustomer.order.product}
                 className="w-10 h-10 rounded-md object-cover border border-[#222222] shrink-0"
               />
               <div className="flex-1 min-w-0">
@@ -581,8 +581,8 @@ export default function EmbeddableWidget({
                 <p className="text-[11px] text-[#888888]">${activeCustomer.order.price.toFixed(2)} USD • {activeCustomer.order.carrier}</p>
               </div>
               <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                activeCustomer.order.status === 'Delayed' 
-                  ? 'bg-[#FF3366]/20 text-[#FF3366] border border-[#FF3366]/30' 
+                activeCustomer.order.status === 'Delayed'
+                  ? 'bg-[#FF3366]/20 text-[#FF3366] border border-[#FF3366]/30'
                   : 'bg-[#7CFF00]/20 text-[#7CFF00] border border-[#7CFF00]/30'
               }`}>
                 {activeCustomer.order.status}
@@ -651,6 +651,18 @@ export default function EmbeddableWidget({
 
         {/* Message Stream */}
         {messages.map((msg, index) => {
+          // STRICT SECURITY: Never expose internal agent notes, handoff summaries, or customer-private metadata in widget
+          if (
+            msg.isInternal ||
+            msg.metadata?.isInternal ||
+            msg.senderRole === 'internal_note' ||
+            msg.metadata?.type === 'INTERNAL_NOTE' ||
+            msg.metadata?.type === 'TRANSFER_HANDOFF' ||
+            msg.messageType === 'internal_note'
+          ) {
+            return null;
+          }
+
           const isCustomer = msg.senderRole === 'customer';
           const isAgent = msg.senderRole === 'agent' || msg.senderId === 'agent_sarah';
           const isSystem = msg.senderRole === 'system';
@@ -665,8 +677,12 @@ export default function EmbeddableWidget({
             );
           }
 
+          const hasTranslatedText = Boolean(msg.metadata?.translatedText || msg.translatedText);
+          const displayText = hasTranslatedText ? (msg.metadata?.translatedText || msg.translatedText) : msg.text;
+          const originalText = msg.text;
+
           return (
-            <div 
+            <div
               key={msg.id || index}
               className={`flex flex-col ${isCustomer ? 'items-end' : 'items-start'}`}
             >
@@ -687,30 +703,53 @@ export default function EmbeddableWidget({
                 )}
                 <span>•</span>
                 <span>{new Date(msg.timestamp || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                {hasTranslatedText && (
+                  <span className="text-[9px] bg-[#1E2E1E] text-[#7CFF00] px-1 py-0.2 rounded font-mono">
+                    Translated
+                  </span>
+                )}
               </div>
 
               {/* Message Bubble */}
-              <div 
+              <div
                 className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-xs leading-relaxed ${
-                  isCustomer 
-                    ? 'bg-[#7CFF00] text-[#090909] font-medium rounded-tr-none shadow-sm' 
+                  isCustomer
+                    ? 'bg-[#7CFF00] text-[#090909] font-medium rounded-tr-none shadow-sm'
                     : isAgent
                       ? 'bg-[#182330] text-[#E2E8F0] border border-[#234E70] rounded-tl-none shadow-sm'
                       : 'bg-[#161616] text-[#E0E0E0] border border-[#262626] rounded-tl-none shadow-sm'
                 }`}
               >
                 {/* Text */}
-                {msg.text && (
-                  <p className="whitespace-pre-wrap break-words">{msg.text}</p>
+                {displayText && (
+                  <p className="whitespace-pre-wrap break-words">{displayText}</p>
+                )}
+
+                {/* Collapsible Original Message Inspection for customer transparency */}
+                {hasTranslatedText && originalText && originalText !== displayText && (
+                  <details className="text-[10px] text-[#888888] mt-1.5 pt-1 border-t border-[#333333]/50 cursor-pointer">
+                    <summary className="hover:text-[#CCCCCC] select-none text-[9px] text-[#777777]">Original message</summary>
+                    <p className="mt-1 p-1 bg-black/40 rounded border border-white/10 text-[10px] italic text-[#AAAAAA]">
+                      "{originalText}"
+                    </p>
+                  </details>
+                )}
+
+                {/* Translation unavailable notice if flagged */}
+                {msg.metadata?.translationUnavailable && (
+                  <div className="mt-1.5 pt-1 text-[9px] text-[#F59E0B] flex items-center space-x-1">
+                    <AlertTriangle className="w-2.5 h-2.5" />
+                    <span>Translation service currently unavailable (showing original)</span>
+                  </div>
                 )}
 
                 {/* Attachment if present */}
                 {msg.attachment && (msg.attachment.dataUrl || msg.attachment.id) && (
                   <div className="mt-2 rounded-lg overflow-hidden border border-[#333333] space-y-1">
                     {msg.attachment.dataUrl && (
-                      <img 
-                        src={msg.attachment.dataUrl} 
-                        alt={msg.attachment.name || "Attachment"} 
+                      <img
+                        src={msg.attachment.dataUrl}
+                        alt={msg.attachment.name || "Attachment"}
                         className="max-h-48 object-cover w-full"
                       />
                     )}
@@ -768,7 +807,7 @@ export default function EmbeddableWidget({
             <Paperclip className="w-3.5 h-3.5 text-[#7CFF00]" />
             <span className="text-[#CCCCCC] truncate text-[11px]">{attachment.name}</span>
           </div>
-          <button 
+          <button
             onClick={() => setAttachment(null)}
             className="text-[#FF3366] hover:underline text-[11px]"
           >
@@ -779,7 +818,7 @@ export default function EmbeddableWidget({
 
       {/* 6. Message Input & Dispatch Bar */}
       <div className="p-3 bg-[#111111] border-t border-[#1E1E1E] shrink-0">
-        <form 
+        <form
           onSubmit={(e) => {
             e.preventDefault();
             handleSendMessage();
@@ -787,12 +826,12 @@ export default function EmbeddableWidget({
           className="flex items-center space-x-2"
         >
           {/* File upload button */}
-          <input 
-            type="file" 
-            ref={fileInputRef} 
+          <input
+            type="file"
+            ref={fileInputRef}
             onChange={handleFileChange}
-            accept="image/*,.pdf" 
-            className="hidden" 
+            accept="image/*,.pdf"
+            className="hidden"
           />
           <button
             type="button"

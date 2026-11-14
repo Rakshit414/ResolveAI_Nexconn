@@ -41,7 +41,7 @@ export async function requireAgentAuth(req, res, next) {
 
     // Query session joined with brand_memberships to verify deactivation status
     const sessionRes = await query(`
-      SELECT 
+      SELECT
         s.id AS session_id,
         s.user_id,
         s.brand_id,
@@ -83,7 +83,8 @@ export async function requireAgentAuth(req, res, next) {
       brandId: session.brand_id,
       name: session.name,
       email: session.email,
-      role: session.role
+      role: session.role,
+      sessionId: session.session_id
     };
 
     next();

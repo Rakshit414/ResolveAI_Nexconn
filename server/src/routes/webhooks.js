@@ -183,12 +183,49 @@ export async function handleNexconnWebhook(req, res) {
         const onlineStatus = eventData.status === 0 || eventData.status === 'online' ? 'online' : 'offline';
 
         await query(`
-          UPDATE webhook_receipts 
-          SET processing_status = 'processed', processed_at = NOW() 
+          UPDATE webhook_receipts
+          SET processing_status = 'processed', processed_at = NOW()
           WHERE event_id = $1
         `, [eventId]);
 
         results.push({ eventId, type: eventType, userId: targetUserId, status: onlineStatus, processed: true });
+        continue;
+      }
+
+      // Handle message delivery & status updates
+      if (eventType === 'message:delivered' || eventType === 'message:read' || eventType === 'message:status') {
+        const messageId = eventData.messageId || eventData.msgUID || eventData.id;
+        const deliveryStatus = eventData.status || (eventType === 'message:delivered' ? 'delivered' : eventType === 'message:read' ? 'read' : 'updated');
+
+        if (messageId) {
+          await query(`
+            UPDATE message_archive
+            SET content_payload = jsonb_set(
+              COALESCE(content_payload, '{}'::jsonb),
+              '{deliveryStatus}',
+              to_jsonb($1::text)
+            )
+            WHERE nexconn_message_id = $2
+          `, [deliveryStatus, messageId]);
+
+          await query(`
+            UPDATE outbox_messages
+            SET metadata = jsonb_set(
+              COALESCE(metadata, '{}'::jsonb),
+              '{deliveryStatus}',
+              to_jsonb($1::text)
+            )
+            WHERE nexconn_message_id = $2
+          `, [deliveryStatus, messageId]);
+        }
+
+        await query(`
+          UPDATE webhook_receipts
+          SET processing_status = 'processed', processed_at = NOW()
+          WHERE event_id = $1
+        `, [eventId]);
+
+        results.push({ eventId, type: eventType, messageId, status: 'status_updated' });
         continue;
       }
 
@@ -232,7 +269,7 @@ export async function handleNexconnWebhook(req, res) {
 
         if (ticketId) {
           const ticketCheck = await query(`
-            SELECT t.id 
+            SELECT t.id
             FROM tickets t
             JOIN customers c ON t.customer_id = c.id AND t.brand_id = c.brand_id
             WHERE t.id = $1 AND t.brand_id = $2 AND c.nexconn_user_id = $3
@@ -246,11 +283,11 @@ export async function handleNexconnWebhook(req, res) {
         if (!resolvedTicketId) {
           // Query active tickets for this customer
           const activeTicketsRes = await query(`
-            SELECT t.id 
+            SELECT t.id
             FROM tickets t
             JOIN customers c ON t.customer_id = c.id AND t.brand_id = c.brand_id
-            WHERE t.brand_id = $1 
-              AND c.nexconn_user_id = $2 
+            WHERE t.brand_id = $1
+              AND c.nexconn_user_id = $2
               AND t.status IN ('AI Handling', 'Human Requested', 'Human Agent Active')
             ORDER BY t.last_updated DESC
           `, [brandId, senderUserId]);

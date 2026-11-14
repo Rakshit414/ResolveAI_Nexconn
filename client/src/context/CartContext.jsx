@@ -34,8 +34,8 @@ export function loadCartFromStorage() {
         unitPriceCents = Math.round(parseFloat(item.price) * 100);
       }
 
-      const quantity = typeof item.quantity === 'number' && item.quantity > 0 
-        ? Math.floor(item.quantity) 
+      const quantity = typeof item.quantity === 'number' && item.quantity > 0
+        ? Math.floor(item.quantity)
         : 1;
 
       if (unitPriceCents > 0) {
@@ -66,6 +66,20 @@ export function saveCartToStorage(cartItems) {
   }
 }
 
+import {
+  TAX_RATE,
+  FREE_SHIPPING_THRESHOLD_CENTS,
+  FLAT_SHIPPING_CENTS,
+  calculateCartTotals
+} from '../utils/cartMath';
+
+export {
+  TAX_RATE,
+  FREE_SHIPPING_THRESHOLD_CENTS,
+  FLAT_SHIPPING_CENTS,
+  calculateCartTotals
+};
+
 const CartContext = createContext(null);
 
 export function CartProvider({ children }) {
@@ -78,19 +92,8 @@ export function CartProvider({ children }) {
     saveCartToStorage(cart);
   }, [cart]);
 
-  // Derived metrics calculated strictly with integer cents
-  const { itemCount, cartSubtotalCents } = useMemo(() => {
-    let count = 0;
-    let totalCents = 0;
-    for (const item of cart) {
-      count += item.quantity;
-      totalCents += item.unitPriceCents * item.quantity;
-    }
-    return {
-      itemCount: count,
-      cartSubtotalCents: totalCents
-    };
-  }, [cart]);
+  // Derived financial metrics calculated strictly with integer cents
+  const totals = useMemo(() => calculateCartTotals(cart), [cart]);
 
   // Add product to cart and immediately open drawer
   const addToCart = useCallback((product, chosenVariant) => {
@@ -146,7 +149,7 @@ export function CartProvider({ children }) {
 
   // Remove a specific line item
   const removeItem = useCallback((productId, variant) => {
-    setCart(prevCart => 
+    setCart(prevCart =>
       prevCart.filter(item => !(item.productId === productId && item.variant === variant))
     );
   }, []);
@@ -162,9 +165,7 @@ export function CartProvider({ children }) {
 
   const value = useMemo(() => ({
     cart,
-    itemCount,
-    cartSubtotalCents,
-    cartSubtotalFormatted: (cartSubtotalCents / 100).toFixed(2),
+    ...totals,
     isCartOpen,
     openCart,
     closeCart,
@@ -175,8 +176,7 @@ export function CartProvider({ children }) {
     clearCart
   }), [
     cart,
-    itemCount,
-    cartSubtotalCents,
+    totals,
     isCartOpen,
     openCart,
     closeCart,

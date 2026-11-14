@@ -1,15 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  Sparkles, 
-  Send, 
-  Edit3, 
-  RefreshCw, 
-  ChevronDown, 
-  ChevronUp, 
-  ShieldCheck, 
-  X
+import {
+  Sparkles,
+  Send,
+  Edit3,
+  RefreshCw,
+  ChevronDown,
+  ChevronUp,
+  ShieldCheck,
+  X,
+  AlertTriangle,
+  BookOpen
 } from 'lucide-react';
-import { analyzeConversation, summarizeConversation, getSuggestedReply } from '../services/api';
+import {
+  analyzeConversation,
+  summarizeConversation,
+  getSuggestedReply,
+  getGroundedCopilotResponse
+} from '../services/api';
 
 export default function AICopilotPanel({
   ticket,
@@ -25,6 +32,7 @@ export default function AICopilotPanel({
   const [isSending, setIsSending] = useState(false);
   const [showFullAnalysis, setShowFullAnalysis] = useState(false);
   const [policyRefs, setPolicyRefs] = useState([]);
+  const [isMissingKnowledge, setIsMissingKnowledge] = useState(false);
 
   // Ref to track currently active ticket ID and discard stale in-flight AI responses
   const activeTicketIdRef = useRef(ticket?.id);
@@ -50,8 +58,9 @@ export default function AICopilotPanel({
 
     setSuggestedReply(ticket.suggestedReply || '');
     setIsEditingReply(false);
+    setIsMissingKnowledge(false);
     setPolicyRefs(
-      ticket.category === 'Delivery Delay' 
+      ticket.category === 'Delivery Delay'
         ? ['Standard delivery: 4–6 business days', 'Delivery estimates must be verified']
         : ticket.category === 'Refund Request'
         ? ['7-day return window from delivery', 'Return item verification at hub']
@@ -65,6 +74,7 @@ export default function AICopilotPanel({
   const handleRunAICopilot = async (targetTicketId) => {
     if (!ticket || !messages || messages.length === 0) return;
     setIsLoading(true);
+    setIsMissingKnowledge(false);
 
     try {
       const payload = {
@@ -77,10 +87,14 @@ export default function AICopilotPanel({
         order: ticket.customer?.order,
       };
 
-      const [analysisRes, summaryRes, replyRes] = await Promise.allSettled([
+      const lastCustMsg = messages.filter(m => m.senderRole === 'customer').pop();
+      const queryText = lastCustMsg?.text || ticket.summary || ticket.customer?.order?.reportedIssue || '';
+
+      const [analysisRes, summaryRes, replyRes, groundedRes] = await Promise.allSettled([
         analyzeConversation(payload),
         summarizeConversation(payload),
         getSuggestedReply(payload),
+        queryText ? getGroundedCopilotResponse({ query: queryText, conversationContext: ticket.summary }) : Promise.resolve(null)
       ]);
 
       // Guard against race condition: discard response if user switched tickets while request was in-flight
@@ -100,6 +114,20 @@ export default function AICopilotPanel({
         setSuggestedReply(replyRes.value.data.suggestedReply);
         if (replyRes.value.data.policyReferences) {
           setPolicyRefs(replyRes.value.data.policyReferences);
+        }
+      }
+
+      // Check grounded Knowledge Hub response
+      if (groundedRes.status === 'fulfilled' && groundedRes.value) {
+        const gr = groundedRes.value;
+        if (gr.escalationRequired) {
+          setIsMissingKnowledge(true);
+        }
+        if (gr.suggestedReply) {
+          setSuggestedReply(gr.suggestedReply);
+        }
+        if (Array.isArray(gr.knowledgeReferences) && gr.knowledgeReferences.length > 0) {
+          setPolicyRefs(gr.knowledgeReferences);
         }
       }
     } catch (err) {
@@ -159,7 +187,7 @@ export default function AICopilotPanel({
 
       {/* Drawer Body */}
       <div className="p-4 space-y-3 flex-1 overflow-y-auto">
-        
+
         {/* A. Issue Overview */}
         <div className="bg-[#141414] border border-[#222222] rounded-xl p-3 text-xs space-y-2">
           <div className="flex items-center justify-between">
@@ -201,6 +229,19 @@ export default function AICopilotPanel({
               <span>{isEditingReply ? 'Done' : 'Edit'}</span>
             </button>
           </div>
+
+          {/* Missing Approved Knowledge Escalation Warning */}
+          {isMissingKnowledge && (
+            <div className="p-2.5 rounded-lg bg-[#451A03] border border-[#B45309] text-[11px] text-[#FDE68A] space-y-1 animate-fadeIn">
+              <div className="flex items-center space-x-1.5 font-bold text-[#F59E0B]">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                <span>Escalation Required — No Approved Brand Policy</span>
+              </div>
+              <p className="text-[10px] text-[#FBBF24] leading-relaxed">
+                Strict Guardrail: Resolve AI Copilot strictly refuses to invent or hallucinate policies when approved brand guidance is missing.
+              </p>
+            </div>
+          )}
 
           <div className="text-[10px] text-[#8A8A8A] flex items-center space-x-1 bg-[#0A0A0A] px-2 py-1 rounded border border-[#1E1E1E]">
             <ShieldCheck className="w-3.5 h-3.5 text-[#7CFF00] shrink-0" />

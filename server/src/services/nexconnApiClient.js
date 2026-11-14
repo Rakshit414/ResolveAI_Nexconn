@@ -23,10 +23,10 @@ export async function sendDirectChannelMessage({
 
   // 1. Nonce length strictly <= 18 characters
   const nonce = Math.floor(Math.random() * 1e16).toString().slice(0, 18);
-  
+
   // 2. Timestamp strictly Unix milliseconds
   const timestamp = Date.now().toString();
-  
+
   // 3. Signature: SHA1(AppSecret + Nonce + Timestamp)
   const signature = crypto
     .createHash('sha1')
@@ -66,7 +66,7 @@ export async function sendDirectChannelMessage({
         'Timestamp': timestamp,
         'Signature': signature
       },
-      timeout: 10000
+      timeout: parseInt(process.env.NEXCONN_TIMEOUT_MS, 10) || 10000
     });
 
     // 6. Application-level success check: STRICTLY code === 0

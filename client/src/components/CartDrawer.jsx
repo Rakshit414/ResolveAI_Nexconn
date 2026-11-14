@@ -1,21 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
-import { 
-  ShoppingBag, 
-  X, 
-  Trash2, 
-  Plus, 
-  Minus, 
-  ArrowRight, 
-  ShieldCheck, 
-  Truck, 
-  RotateCcw, 
-  CheckCircle2, 
+import {
+  ShoppingBag,
+  X,
+  Trash2,
+  Plus,
+  Minus,
+  ArrowRight,
+  ShieldCheck,
+  Truck,
+  RotateCcw,
+  CheckCircle2,
   Sparkles,
   MessageSquare,
   AlertCircle
 } from 'lucide-react';
 import { useCart } from '../context/CartContext';
+import { useLanguage } from '../context/LanguageContext';
 
 export default function CartDrawer({ onOpenSupportForOrder }) {
   const {
@@ -23,12 +24,22 @@ export default function CartDrawer({ onOpenSupportForOrder }) {
     itemCount,
     cartSubtotalCents,
     cartSubtotalFormatted,
+    shippingCents,
+    shippingFormatted,
+    isFreeShipping,
+    taxCents,
+    taxFormatted,
+    grandTotalCents,
+    grandTotalFormatted,
     isCartOpen,
     closeCart,
     updateQuantity,
     removeItem,
     clearCart
   } = useCart();
+
+  const { storefront } = useLanguage();
+  const c = storefront?.cart || {};
 
   const [checkoutStep, setCheckoutStep] = useState('cart'); // 'cart' | 'checkout' | 'confirmation'
   const [shippingInfo, setShippingInfo] = useState({
@@ -73,14 +84,7 @@ export default function CartDrawer({ onOpenSupportForOrder }) {
 
   if (!isCartOpen) return null;
 
-  // Exact integer cents monetary calculation
   const freeShippingThresholdCents = 7500; // $75.00
-  const isFreeShipping = cartSubtotalCents >= freeShippingThresholdCents;
-  const shippingCents = cart.length === 0 ? 0 : (isFreeShipping ? 0 : 500); // $5.00 flat rate
-  const grandTotalCents = cartSubtotalCents + shippingCents;
-
-  const shippingFormatted = (shippingCents / 100).toFixed(2);
-  const grandTotalFormatted = (grandTotalCents / 100).toFixed(2);
 
   // Auto-fill demo details
   const handleAutoFillDemo = () => {
@@ -99,37 +103,41 @@ export default function CartDrawer({ onOpenSupportForOrder }) {
   const handlePlaceOrder = (e) => {
     e?.preventDefault();
     const errors = {};
-    if (!shippingInfo.fullName.trim()) errors.fullName = 'Full name is required';
-    if (!shippingInfo.email.trim() || !shippingInfo.email.includes('@')) errors.email = 'Valid email is required';
-    if (!shippingInfo.address.trim()) errors.address = 'Street address is required';
-    if (!shippingInfo.city.trim()) errors.city = 'City is required';
+    if (!shippingInfo.fullName.trim()) errors.fullName = 'Please enter your name';
+    if (!shippingInfo.email.trim() || !shippingInfo.email.includes('@')) errors.email = 'Valid email required';
+    if (!shippingInfo.address.trim()) errors.address = 'Shipping address required';
+    if (!shippingInfo.city.trim()) errors.city = 'City required';
 
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors);
       return;
     }
 
-    const orderId = `NC2026-${Math.floor(1000 + Math.random() * 9000)}`;
-    const placedOrder = {
-      orderId,
-      placedAt: new Date().toISOString(),
+    // Generate simulated order confirmation record
+    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+    const newOrderId = `NC${randomSuffix}`;
+    const newTracking = `TRK-NC-${Math.floor(100000 + Math.random() * 900000)}`;
+
+    const confirmationData = {
+      orderId: newOrderId,
+      trackingNumber: newTracking,
+      carrier: 'FedEx Express',
+      shippingInfo: { ...shippingInfo },
       items: [...cart],
       itemCount,
-      subtotalFormatted: cartSubtotalFormatted,
+      cartSubtotalFormatted,
       shippingFormatted,
+      taxFormatted,
       grandTotalFormatted,
-      shippingInfo: { ...shippingInfo },
-      trackingNumber: `TRK-NC-${Math.floor(100000 + Math.random() * 900000)}`,
-      carrier: 'FedEx Express Priority',
-      estimatedDelivery: '3–4 Business Days'
+      placedAt: new Date().toISOString(),
+      estimatedDelivery: '3–5 Business Days'
     };
 
-    setConfirmedOrder(placedOrder);
+    setConfirmedOrder(confirmationData);
     setCheckoutStep('confirmation');
-    clearCart(); // Safely empty cart state
+    clearCart(); // Clear active bag now that order has transitioned to confirmed
   };
 
-  // Return to shopping from confirmation
   const handleFinishConfirmation = () => {
     setConfirmedOrder(null);
     setCheckoutStep('cart');
@@ -137,15 +145,9 @@ export default function CartDrawer({ onOpenSupportForOrder }) {
   };
 
   return ReactDOM.createPortal(
-    <div 
-      id="cart-drawer-root" 
-      className="fixed inset-0 z-[100] overflow-hidden animate-fadeIn" 
-      role="dialog" 
-      aria-modal="true" 
-      aria-labelledby="cart-heading"
-    >
-      {/* 1. Backdrop Overlay (Click to close) */}
-      <div 
+    <div id="cart-drawer-root" className="fixed inset-0 z-50 overflow-hidden font-sans">
+      {/* 1. Backdrop Overlay */}
+      <div
         id="cart-backdrop"
         onClick={closeCart}
         className="fixed inset-0 bg-black/80 backdrop-blur-sm transition-opacity cursor-pointer"
@@ -153,8 +155,8 @@ export default function CartDrawer({ onOpenSupportForOrder }) {
 
       {/* 2. Slide-over Container (Right on desktop, full-screen on mobile) */}
       <div className="fixed inset-y-0 right-0 max-w-full flex pl-0 sm:pl-10 pointer-events-none">
-        <div 
-          id="cart-drawer" 
+        <div
+          id="cart-drawer"
           className="pointer-events-auto w-screen sm:w-[480px] max-w-full bg-[#0D0D0D] border-l border-[#222222] shadow-2xl flex flex-col justify-between text-[#FFFFFF] animate-slideInRight"
         >
           {/* =================================================================
@@ -167,10 +169,16 @@ export default function CartDrawer({ onOpenSupportForOrder }) {
               </div>
               <div>
                 <h2 id="cart-heading" className="font-extrabold text-sm text-[#FFFFFF] tracking-tight">
-                  {checkoutStep === 'cart' ? 'Your Shopping Bag' : checkoutStep === 'checkout' ? 'Demo Checkout' : 'Order Confirmed'}
+                  {checkoutStep === 'cart'
+                    ? (c.headingCart || 'Your Shopping Bag')
+                    : checkoutStep === 'checkout'
+                      ? (c.headingCheckout || 'Demo Checkout')
+                      : (c.headingConfirmed || 'Order Confirmed')}
                 </h2>
                 <p id="cart-header-subtext" className="text-[11px] text-[#888888] font-mono">
-                  {checkoutStep === 'cart' ? `${itemCount} ${itemCount === 1 ? 'item' : 'items'} in bag` : 'NovaCart Official Store'}
+                  {checkoutStep === 'cart'
+                    ? `${itemCount} ${itemCount === 1 ? (c.itemInBag || 'item in bag') : (c.itemsInBag || 'items in bag')}`
+                    : (c.officialStore || 'NovaCart Official Store')}
                 </p>
               </div>
             </div>
@@ -198,11 +206,12 @@ export default function CartDrawer({ onOpenSupportForOrder }) {
                     {isFreeShipping ? (
                       <span className="text-[#7CFF00] font-semibold flex items-center space-x-1">
                         <Sparkles className="w-3.5 h-3.5" />
-                        <span>You unlocked FREE Express Shipping!</span>
+                        <span id="cart-free-shipping-unlocked">{c.freeShippingUnlocked || 'You unlocked FREE Express Shipping!'}</span>
                       </span>
                     ) : (
                       <span className="text-[#AAAAAA]">
-                        Add <strong className="text-[#FFFFFF] font-mono">${((freeShippingThresholdCents - cartSubtotalCents) / 100).toFixed(2)}</strong> more for FREE Shipping
+                        {c.addPrefix ? `${c.addPrefix} ` : ''}
+                        <strong className="text-[#FFFFFF] font-mono">${((freeShippingThresholdCents - cartSubtotalCents) / 100).toFixed(2)}</strong> {c.addMoreForFreeShipping || 'more for FREE Shipping'}
                       </span>
                     )}
                     <span className="font-mono text-[#7CFF00] font-bold">
@@ -210,7 +219,7 @@ export default function CartDrawer({ onOpenSupportForOrder }) {
                     </span>
                   </div>
                   <div className="w-full h-1.5 bg-[#222222] rounded-full overflow-hidden">
-                    <div 
+                    <div
                       className="h-full bg-[#7CFF00] rounded-full transition-all duration-300"
                       style={{ width: `${Math.min(100, (cartSubtotalCents / freeShippingThresholdCents) * 100)}%` }}
                     />
@@ -227,9 +236,9 @@ export default function CartDrawer({ onOpenSupportForOrder }) {
                       <ShoppingBag className="w-8 h-8 stroke-1 text-[#666666]" />
                     </div>
                     <div className="space-y-1">
-                      <h3 className="font-bold text-sm text-[#FFFFFF]">Your bag is empty</h3>
-                      <p className="text-xs text-[#777777] max-w-xs">
-                        Explore our performance apparel, wireless charging gear, and noise-cancelling audio.
+                      <h3 id="cart-empty-title" className="font-bold text-sm text-[#FFFFFF]">{c.emptyTitle || 'Your bag is empty'}</h3>
+                      <p id="cart-empty-desc" className="text-xs text-[#777777] max-w-xs">
+                        {c.emptyDesc || 'Explore our performance apparel, wireless charging gear, and noise-cancelling audio.'}
                       </p>
                     </div>
                     <button
@@ -237,7 +246,7 @@ export default function CartDrawer({ onOpenSupportForOrder }) {
                       onClick={closeCart}
                       className="px-5 py-2.5 rounded-xl bg-[#181818] hover:bg-[#222222] text-[#FFFFFF] text-xs font-semibold border border-[#2A2A2A] hover:border-[#7CFF00]/50 transition-colors"
                     >
-                      Continue Shopping
+                      {c.continueShopping || 'Continue Shopping'}
                     </button>
                   </div>
                 ) : (
@@ -250,8 +259,8 @@ export default function CartDrawer({ onOpenSupportForOrder }) {
                     const itemKey = `${item.productId}_${sanitizedVariant}`;
 
                     return (
-                      <div 
-                        key={itemKey} 
+                      <div
+                        key={itemKey}
                         id={`cart-item-${item.productId}`}
                         data-product-id={item.productId}
                         data-item-key={itemKey}
@@ -267,9 +276,9 @@ export default function CartDrawer({ onOpenSupportForOrder }) {
                         {/* Product Metadata & Actions */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between gap-2">
-                            <h4 
-                              id={`cart-item-title-${item.productId}`} 
-                              className="font-bold text-xs text-[#FFFFFF] truncate leading-snug" 
+                            <h4
+                              id={`cart-item-title-${item.productId}`}
+                              className="font-bold text-xs text-[#FFFFFF] truncate leading-snug"
                               title={item.name}
                             >
                               {item.name}
@@ -289,7 +298,7 @@ export default function CartDrawer({ onOpenSupportForOrder }) {
                           {/* Selected Variant Badge */}
                           {item.variant && (
                             <div className="mt-0.5">
-                              <span 
+                              <span
                                 id={`cart-item-variant-${item.productId}`}
                                 className="inline-block text-[10px] font-semibold text-[#7CFF00] bg-[#7CFF00]/10 px-2 py-0.2 rounded border border-[#7CFF00]/25"
                               >
@@ -312,7 +321,7 @@ export default function CartDrawer({ onOpenSupportForOrder }) {
                               >
                                 <Minus className="w-3.5 h-3.5" />
                               </button>
-                              <span 
+                              <span
                                 id={`cart-item-qty-${item.productId}`}
                                 className="w-6 text-center text-xs font-bold font-mono text-[#FFFFFF]"
                               >
@@ -332,14 +341,14 @@ export default function CartDrawer({ onOpenSupportForOrder }) {
 
                             {/* Line Subtotal */}
                             <div className="text-right">
-                              <span 
+                              <span
                                 id={`cart-item-subtotal-${item.productId}`}
                                 className="text-xs font-bold text-[#FFFFFF] font-mono"
                               >
                                 ${lineSubtotalFormatted}
                               </span>
                               {item.quantity > 1 && (
-                                <span 
+                                <span
                                   id={`cart-item-price-${item.productId}`}
                                   className="block text-[10px] text-[#666666]"
                                 >
@@ -360,23 +369,23 @@ export default function CartDrawer({ onOpenSupportForOrder }) {
                 <div className="p-6 bg-[#111111] border-t border-[#1E1E1E] space-y-3 shrink-0">
                   <div className="space-y-1.5 text-xs text-[#888888]">
                     <div className="flex justify-between">
-                      <span>Items Subtotal ({itemCount})</span>
+                      <span>{c.itemsSubtotal || 'Items Subtotal'} ({itemCount})</span>
                       <span id="cart-subtotal" className="text-[#FFFFFF] font-mono font-semibold">
                         ${cartSubtotalFormatted} USD
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span>Shipping (Express 2-3 Days)</span>
+                      <span>{c.shippingExpress || 'Shipping (Express 2-3 Days)'}</span>
                       <span id="cart-shipping" className="font-mono font-semibold text-[#7CFF00]">
-                        {isFreeShipping ? 'FREE' : `$${shippingFormatted} USD`}
+                        {isFreeShipping ? (c.free || 'FREE') : `$${shippingFormatted} USD`}
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span>Estimated Sales Tax</span>
-                      <span className="text-[#FFFFFF] font-mono">$0.00</span>
+                      <span>{c.estimatedTax || 'Estimated Sales Tax (8%)'}</span>
+                      <span id="cart-tax" className="text-[#FFFFFF] font-mono">${taxFormatted} USD</span>
                     </div>
                     <div className="pt-2 border-t border-[#1C1C1C] flex justify-between text-sm font-bold text-[#FFFFFF]">
-                      <span>Total</span>
+                      <span>{c.total || 'Total'}</span>
                       <span id="cart-grand-total" className="font-mono text-base text-[#7CFF00]">
                         ${grandTotalFormatted} USD
                       </span>
@@ -389,7 +398,7 @@ export default function CartDrawer({ onOpenSupportForOrder }) {
                       onClick={() => setCheckoutStep('checkout')}
                       className="w-full py-3 px-4 rounded-xl bg-[#7CFF00] hover:bg-[#6BE000] text-[#090909] font-black text-xs uppercase tracking-wider flex items-center justify-center space-x-2 shadow-neon-sm transition-all"
                     >
-                      <span>Proceed to Demo Checkout</span>
+                      <span>{c.proceedCheckout || 'Proceed to Demo Checkout'}</span>
                       <ArrowRight className="w-4 h-4" />
                     </button>
 
@@ -399,13 +408,13 @@ export default function CartDrawer({ onOpenSupportForOrder }) {
                         onClick={clearCart}
                         className="hover:text-[#FF4D4D] transition-colors underline decoration-dotted"
                       >
-                        Clear Bag
+                        {c.clearBag || 'Clear Bag'}
                       </button>
                       <button
                         onClick={closeCart}
                         className="hover:text-[#FFFFFF] transition-colors"
                       >
-                        Continue Shopping
+                        {c.continueShopping || 'Continue Shopping'}
                       </button>
                     </div>
                   </div>
@@ -423,16 +432,16 @@ export default function CartDrawer({ onOpenSupportForOrder }) {
               <div className="p-3.5 rounded-xl bg-[#161616] border border-[#262626] flex items-start space-x-2.5">
                 <ShieldCheck className="w-4 h-4 text-[#7CFF00] shrink-0 mt-0.5" />
                 <div className="text-xs space-y-0.5">
-                  <p className="font-bold text-[#FFFFFF]">Simulated Checkout</p>
+                  <p className="font-bold text-[#FFFFFF]">{c.simulatedNoticeTitle || 'Simulated Checkout'}</p>
                   <p className="text-[#888888] text-[11px] leading-relaxed">
-                    This is a demonstration store. No real payment or credit card is processed.
+                    {c.simulatedNoticeDesc || 'This is a demonstration store. No real payment or credit card is processed.'}
                   </p>
                 </div>
               </div>
 
               {/* Quick Auto-Fill */}
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-[#CCCCCC]">Shipping Information</span>
+                <span className="text-xs font-semibold text-[#CCCCCC]">{c.shippingInfoTitle || 'Shipping Information'}</span>
                 <button
                   type="button"
                   id="btn-auto-fill-demo"
@@ -440,14 +449,14 @@ export default function CartDrawer({ onOpenSupportForOrder }) {
                   className="text-[11px] text-[#7CFF00] hover:underline font-semibold flex items-center space-x-1"
                 >
                   <Sparkles className="w-3 h-3" />
-                  <span>Auto-fill Demo Details</span>
+                  <span>{c.autoFillDemo || 'Auto-fill Demo Details'}</span>
                 </button>
               </div>
 
               {/* Shipping Form */}
               <form onSubmit={handlePlaceOrder} className="space-y-3.5">
                 <div>
-                  <label className="block text-[11px] text-[#888888] mb-1">Full Name</label>
+                  <label className="block text-[11px] text-[#888888] mb-1">{c.fullName || 'Full Name'}</label>
                   <input
                     type="text"
                     id="input-full-name"
@@ -460,7 +469,7 @@ export default function CartDrawer({ onOpenSupportForOrder }) {
                 </div>
 
                 <div>
-                  <label className="block text-[11px] text-[#888888] mb-1">Email Address</label>
+                  <label className="block text-[11px] text-[#888888] mb-1">{c.emailAddress || 'Email Address'}</label>
                   <input
                     type="email"
                     id="input-email"
@@ -473,7 +482,7 @@ export default function CartDrawer({ onOpenSupportForOrder }) {
                 </div>
 
                 <div>
-                  <label className="block text-[11px] text-[#888888] mb-1">Shipping Address</label>
+                  <label className="block text-[11px] text-[#888888] mb-1">{c.shippingAddress || 'Shipping Address'}</label>
                   <input
                     type="text"
                     id="input-address"
@@ -487,7 +496,7 @@ export default function CartDrawer({ onOpenSupportForOrder }) {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[11px] text-[#888888] mb-1">City</label>
+                    <label className="block text-[11px] text-[#888888] mb-1">{c.city || 'City'}</label>
                     <input
                       type="text"
                       id="input-city"
@@ -499,7 +508,7 @@ export default function CartDrawer({ onOpenSupportForOrder }) {
                     {formErrors.city && <p className="text-[10px] text-[#FF4D4D] mt-1">{formErrors.city}</p>}
                   </div>
                   <div>
-                    <label className="block text-[11px] text-[#888888] mb-1">Postal Code</label>
+                    <label className="block text-[11px] text-[#888888] mb-1">{c.postalCode || 'Postal Code'}</label>
                     <input
                       type="text"
                       id="input-postal-code"
@@ -513,17 +522,17 @@ export default function CartDrawer({ onOpenSupportForOrder }) {
 
                 {/* Delivery Option */}
                 <div className="pt-2">
-                  <label className="block text-[11px] text-[#888888] mb-1.5">Delivery Method</label>
+                  <label className="block text-[11px] text-[#888888] mb-1.5">{c.deliveryMethod || 'Delivery Method'}</label>
                   <div className="p-3 rounded-xl bg-[#141414] border border-[#7CFF00]/40 flex items-center justify-between text-xs">
                     <div className="flex items-center space-x-2.5">
                       <Truck className="w-4 h-4 text-[#7CFF00]" />
                       <div>
-                        <span className="font-bold text-[#FFFFFF]">FedEx Priority Express</span>
-                        <span className="block text-[10px] text-[#777777]">Estimated 2–3 Business Days</span>
+                        <span className="font-bold text-[#FFFFFF]">{c.fedexPriority || 'FedEx Priority Express'}</span>
+                        <span className="block text-[10px] text-[#777777]">{c.estimatedDays || 'Estimated 2–3 Business Days'}</span>
                       </div>
                     </div>
                     <span className="font-mono font-bold text-[#7CFF00]">
-                      {isFreeShipping ? 'FREE' : `$${shippingFormatted}`}
+                      {isFreeShipping ? (c.free || 'FREE') : `$${shippingFormatted}`}
                     </span>
                   </div>
                 </div>
@@ -531,17 +540,21 @@ export default function CartDrawer({ onOpenSupportForOrder }) {
                 {/* Order Summary Recap */}
                 <div className="p-3.5 rounded-xl bg-[#111111] border border-[#1E1E1E] space-y-1.5 text-xs">
                   <div className="flex justify-between text-[#888888]">
-                    <span>Items Total ({itemCount})</span>
+                    <span>{c.orderSummary || 'Items Total'} ({itemCount})</span>
                     <span className="font-mono text-[#FFFFFF]">${cartSubtotalFormatted}</span>
                   </div>
                   <div className="flex justify-between text-[#888888]">
-                    <span>Shipping</span>
+                    <span>{c.shippingExpress || 'Shipping'}</span>
                     <span className="font-mono text-[#7CFF00]">
-                      {isFreeShipping ? 'FREE' : `$${shippingFormatted}`}
+                      {isFreeShipping ? (c.free || 'FREE') : `$${shippingFormatted}`}
                     </span>
                   </div>
+                  <div className="flex justify-between text-[#888888]">
+                    <span>{c.estimatedTax || 'Estimated Sales Tax (8%)'}</span>
+                    <span className="font-mono text-[#FFFFFF]">${taxFormatted}</span>
+                  </div>
                   <div className="pt-1.5 border-t border-[#1C1C1C] flex justify-between font-bold text-[#FFFFFF]">
-                    <span>Grand Total</span>
+                    <span>{c.grandTotal || 'Grand Total'}</span>
                     <span className="font-mono text-sm text-[#7CFF00]">${grandTotalFormatted} USD</span>
                   </div>
                 </div>
@@ -554,7 +567,7 @@ export default function CartDrawer({ onOpenSupportForOrder }) {
                     className="w-full py-3 px-4 rounded-xl bg-[#7CFF00] hover:bg-[#6BE000] text-[#090909] font-black text-xs uppercase tracking-wider flex items-center justify-center space-x-2 shadow-neon-sm transition-all"
                   >
                     <CheckCircle2 className="w-4 h-4" />
-                    <span>Complete Demo Order</span>
+                    <span>{c.completeOrder || 'Complete Demo Order'}</span>
                   </button>
 
                   <button
@@ -562,7 +575,7 @@ export default function CartDrawer({ onOpenSupportForOrder }) {
                     onClick={() => setCheckoutStep('cart')}
                     className="w-full py-2 text-center text-xs text-[#888888] hover:text-[#FFFFFF] transition-colors"
                   >
-                    ← Return to Shopping Bag
+                    {c.returnToBag || '← Return to Shopping Bag'}
                   </button>
                 </div>
               </form>
@@ -580,9 +593,9 @@ export default function CartDrawer({ onOpenSupportForOrder }) {
                   <div className="w-12 h-12 rounded-full bg-[#7CFF00]/15 border border-[#7CFF00]/40 flex items-center justify-center text-[#7CFF00] mx-auto">
                     <CheckCircle2 className="w-6 h-6" />
                   </div>
-                  <h3 className="font-black text-base text-[#FFFFFF]">Order Confirmed!</h3>
+                  <h3 id="confirmed-title" className="font-black text-base text-[#FFFFFF]">{c.confirmedTitle || 'Order Confirmed!'}</h3>
                   <p className="text-xs text-[#888888]">
-                    Thank you, <strong className="text-[#FFFFFF]">{confirmedOrder.shippingInfo.fullName}</strong>. Your demonstration order has been created.
+                    {c.confirmedThankYou ? `${c.confirmedThankYou} ` : ''}<strong className="text-[#FFFFFF]">{confirmedOrder.shippingInfo.fullName}</strong>.
                   </p>
                 </div>
 
@@ -590,32 +603,32 @@ export default function CartDrawer({ onOpenSupportForOrder }) {
                 <div className="p-4 rounded-xl bg-[#141414] border border-[#242424] space-y-3 text-xs">
                   <div className="flex items-center justify-between pb-2.5 border-b border-[#1E1E1E]">
                     <div>
-                      <span className="text-[10px] text-[#666666] uppercase block font-mono">Order Number</span>
+                      <span className="text-[10px] text-[#666666] uppercase block font-mono">{c.orderNumberLabel || 'Order Number'}</span>
                       <span id="confirmed-order-id" className="font-mono font-bold text-sm text-[#7CFF00]">
                         {confirmedOrder.orderId}
                       </span>
                     </div>
                     <div className="text-right">
-                      <span className="text-[10px] text-[#666666] uppercase block font-mono">Carrier</span>
+                      <span className="text-[10px] text-[#666666] uppercase block font-mono">{c.carrierLabel || 'Carrier'}</span>
                       <span className="text-xs font-semibold text-[#FFFFFF]">{confirmedOrder.carrier}</span>
                     </div>
                   </div>
 
                   <div className="space-y-1 text-[#AAAAAA] text-[11px]">
                     <div className="flex justify-between">
-                      <span>Delivery Target:</span>
+                      <span>{c.deliveryTargetLabel || 'Delivery Target:'}</span>
                       <span className="text-[#FFFFFF] font-medium">{confirmedOrder.estimatedDelivery}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span>Tracking Code:</span>
+                      <span>{c.trackingCodeLabel || 'Tracking Code:'}</span>
                       <span className="font-mono text-[#7CFF00]">{confirmedOrder.trackingNumber}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span>Items Count:</span>
+                      <span>{c.itemsCountLabel || 'Items Count:'}</span>
                       <span className="font-mono text-[#FFFFFF]">{confirmedOrder.itemCount} items</span>
                     </div>
                     <div className="flex justify-between font-bold text-xs pt-2 border-t border-[#1C1C1C] text-[#FFFFFF]">
-                      <span>Amount Paid:</span>
+                      <span>{c.amountPaidLabel || 'Amount Paid:'}</span>
                       <span className="font-mono text-[#7CFF00]">${confirmedOrder.grandTotalFormatted} USD</span>
                     </div>
                   </div>
@@ -625,10 +638,10 @@ export default function CartDrawer({ onOpenSupportForOrder }) {
                 <div className="p-4 rounded-xl bg-gradient-to-br from-[#121A10] to-[#121212] border border-[#7CFF00]/30 space-y-2.5">
                   <div className="flex items-center space-x-2 text-[#7CFF00]">
                     <MessageSquare className="w-4 h-4" />
-                    <span className="font-bold text-xs">Resolve AI Support Integration</span>
+                    <span className="font-bold text-xs">{c.resolveAiTitle || 'Resolve AI Support Integration'}</span>
                   </div>
                   <p className="text-[11px] text-[#888888] leading-relaxed">
-                    Have questions about delivery times or order details? Chat instantly with our AI copilot or escalate to human specialists.
+                    {c.resolveAiDesc || 'Have questions about delivery times or order details? Chat instantly with our AI copilot or escalate to human specialists.'}
                   </p>
                   <button
                     id="btn-track-in-support"
@@ -640,7 +653,7 @@ export default function CartDrawer({ onOpenSupportForOrder }) {
                     }}
                     className="w-full py-2.5 px-3 rounded-lg bg-[#7CFF00] hover:bg-[#6BE000] text-[#090909] font-black text-xs flex items-center justify-center space-x-1.5 shadow-neon-sm transition-all"
                   >
-                    <span>Track with Resolve AI Assistant</span>
+                    <span>{c.trackWithAssistant || 'Track with Resolve AI Assistant'}</span>
                     <ArrowRight className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -653,7 +666,7 @@ export default function CartDrawer({ onOpenSupportForOrder }) {
                   onClick={handleFinishConfirmation}
                   className="w-full py-3 px-4 rounded-xl bg-[#1A1A1A] hover:bg-[#222222] text-[#FFFFFF] font-semibold text-xs border border-[#2E2E2E] transition-colors"
                 >
-                  Continue Shopping
+                  {c.continueShopping || 'Continue Shopping'}
                 </button>
               </div>
             </div>

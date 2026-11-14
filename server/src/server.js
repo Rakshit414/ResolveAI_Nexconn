@@ -17,11 +17,16 @@ import aiRouter from './routes/ai.js';
 import nexconnRouter from './routes/nexconn.js';
 import knowledgeRouter from './routes/knowledge.js';
 import authRouter from './routes/auth.js';
+import agentRouter from './routes/agent.js';
+import inboxRouter from './routes/inbox.js';
 import webhooksRouter from './routes/webhooks.js';
 import widgetRouter from './routes/widget.js';
 import attachmentsRouter from './routes/attachments.js';
+import translationRouter from './routes/translation.js';
 import { healthCheck } from './db/pool.js';
 import { runMigration } from './db/migrate.js';
+import { dispatchSchedulingOpportunity } from './services/multiTenantScheduler.js';
+import { sweepPendingOutboxJobs } from './services/outboxService.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -48,9 +53,12 @@ app.use('/api/ai', aiRouter);
 app.use('/api/nexconn', nexconnRouter);
 app.use('/api/knowledge', knowledgeRouter);
 app.use('/api/auth', authRouter);
+app.use('/api/agent', agentRouter);
+app.use('/api/inbox', inboxRouter);
 app.use('/api/webhooks', webhooksRouter);
 app.use('/api/widget', widgetRouter);
 app.use('/api/attachments', attachmentsRouter);
+app.use('/api/translation', translationRouter);
 
 // Standalone Embed Widget Loader Script for Host Integration
 app.get('/widget.js', (req, res) => {
@@ -62,10 +70,18 @@ app.get('/widget.js', (req, res) => {
   res.sendFile(path.resolve(__dirname, '../public/widget.js'));
 });
 
-// Health check endpoint
-app.get('/api/health', async (req, res) => {
+// Health check endpoints: support both /api/health and root-level /health
+app.get(['/health', '/api/health'], async (req, res) => {
   const dbHealth = await healthCheck().catch(err => ({ healthy: false, error: err.message }));
-  
+
+  // Wakeup sweep: Resume eligible queued work across tenants when server wakes from idle
+  if (process.env.DATABASE_URL) {
+    try {
+      dispatchSchedulingOpportunity();
+      sweepPendingOutboxJobs();
+    } catch (e) {}
+  }
+
   // In production, if database is unreachable or missing DATABASE_URL, return 503 Service Unavailable
   if (process.env.NODE_ENV === 'production' && (!dbHealth.healthy || dbHealth.mode !== 'postgresql')) {
     return res.status(503).json({
@@ -159,9 +175,30 @@ async function startServer() {
     }
     console.log(`Health check: http://localhost:${PORT}/api/health`);
     console.log(`=========================================`);
+
+    // Startup sweep: Process pending work across tenants immediately after boot
+    if (process.env.DATABASE_URL) {
+      try {
+        console.log('[STARTUP SWEEP] Resuming eligible queued work across tenants...');
+        dispatchSchedulingOpportunity();
+      } catch (e) {
+        console.warn('[STARTUP SWEEP NOTICE]:', e.message);
+      }
+      try {
+        console.log('[STARTUP SWEEP] Reconciling and dispatching eligible outbox jobs...');
+        sweepPendingOutboxJobs();
+      } catch (e) {
+        console.warn('[STARTUP OUTBOX NOTICE]:', e.message);
+      }
+    }
   });
 
   return server;
 }
 
-startServer();
+export { app, startServer };
+export default app;
+
+if (process.argv[1] && (process.argv[1].endsWith('server.js') || process.argv[1].endsWith('server.mjs'))) {
+  startServer();
+}

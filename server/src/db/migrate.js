@@ -28,8 +28,8 @@ export async function backupTicketsJson() {
 export async function runMigration({ dryRun = false } = {}) {
   console.log(`[Migrate] Starting migration (dryRun=${dryRun})...`);
 
-  // 1. Safety backup of tickets.json
-  const backupPath = await backupTicketsJson();
+  // 1. Safety backup of tickets.json (strictly skipped during dry-run)
+  const backupPath = dryRun ? null : await backupTicketsJson();
 
   // 2. Read and register versioned SQL migration files
   const migrationFiles = [
@@ -37,6 +37,7 @@ export async function runMigration({ dryRun = false } = {}) {
     { version: '002_seed_demo_data', filename: '002_seed_demo_data.sql', isSeed: true },
     { version: '003_attachment_blob_storage', filename: '003_attachment_blob_storage.sql', isSeed: false },
     { version: '004_seed_sample_attachment', filename: '004_seed_sample_attachment.sql', isSeed: true },
+    { version: '005_checkpoint_e_workforce_schema', filename: '005_checkpoint_e_workforce_schema.sql', isSeed: false },
   ];
 
   const migrationData = migrationFiles.map(m => {
@@ -50,18 +51,52 @@ export async function runMigration({ dryRun = false } = {}) {
   });
 
   if (dryRun) {
-    console.log('[Migrate] DRY RUN: Validating SQL script syntax and row counts');
-    const sourcePath = path.resolve(__dirname, '../../data/tickets.json');
-    const sourceTickets = JSON.parse(fs.readFileSync(sourcePath, 'utf8'));
+    console.log('[Migrate] DRY RUN: Validating migrations and checking database state without writing data');
+    const pool = getPool();
+    let appliedMigrations = [];
+    let dbConnected = false;
+
+    try {
+      const client = await pool.connect();
+      try {
+        dbConnected = true;
+        const hasTableRes = await client.query(`
+          SELECT 1 FROM information_schema.tables
+          WHERE table_schema = current_schema() AND table_name = '_schema_migrations'
+        `);
+        if (hasTableRes.rows.length > 0) {
+          const appliedRes = await client.query('SELECT version, checksum FROM _schema_migrations ORDER BY version ASC');
+          appliedMigrations = appliedRes.rows;
+
+          // Verify historical checksums against disk
+          for (const recorded of appliedMigrations) {
+            const diskMatch = migrationData.find(m => m.version === recorded.version);
+            if (diskMatch && diskMatch.checksum !== recorded.checksum) {
+              throw new Error(`[Migrate Checksum Fatal Error] Migration ${recorded.version} checksum mismatch: recorded=${recorded.checksum}, disk=${diskMatch.checksum}. Schema alteration detected; failing clearly.`);
+            }
+          }
+        }
+      } finally {
+        client.release();
+      }
+    } catch (err) {
+      if (err.message.includes('Migrate Checksum Fatal Error')) throw err;
+      console.warn('[Migrate] DRY RUN Database notice (read-only):', err.message);
+    }
+
+    const appliedVersions = new Set(appliedMigrations.map(r => r.version));
+    const pending = migrationData.filter(m => !appliedVersions.has(m.version));
+
     return {
       success: true,
       dryRun: true,
-      backupPath,
-      migrations: migrationData.map(m => ({ version: m.version, checksum: m.checksum, len: m.sql.length })),
-      sourceTicketsCount: sourceTickets.length,
-      customers: sourceTickets.map(t => t.customer.name),
-      orders: sourceTickets.map(t => t.orderId),
-      tickets: sourceTickets.map(t => t.id)
+      writesPerformed: 0,
+      databaseConnected: dbConnected,
+      totalMigrations: migrationData.length,
+      appliedCount: appliedVersions.size,
+      pendingCount: pending.length,
+      pendingMigrations: pending.map(m => ({ version: m.version, filename: m.filename, checksum: m.checksum })),
+      verifiedRecordedChecksums: appliedMigrations.map(m => ({ version: m.version, checksum: m.checksum }))
     };
   }
 
@@ -89,7 +124,7 @@ export async function runMigration({ dryRun = false } = {}) {
       if (appliedMap.has(m.version)) {
         const recordedChecksum = appliedMap.get(m.version);
         if (recordedChecksum !== m.checksum) {
-          console.warn(`[Migrate Checksum Note] Migration ${m.version} checksum changed on disk: recorded=${recordedChecksum}, current=${m.checksum}`);
+          throw new Error(`[Migrate Checksum Fatal Error] Migration ${m.version} checksum mismatch: recorded=${recordedChecksum}, disk=${m.checksum}. Schema alteration detected; failing clearly.`);
         } else {
           console.log(`[Migrate] ${m.version} checksum verified (${m.checksum.substring(0, 12)}...)`);
         }
@@ -115,7 +150,7 @@ export async function runMigration({ dryRun = false } = {}) {
     // 3. Post-migration verification
     console.log('[Migrate] Running verification audit...');
     const auditRes = await client.query(`
-      SELECT 
+      SELECT
         (SELECT COUNT(*) FROM brands WHERE id = 'brand_novacart') AS brands,
         (SELECT COUNT(*) FROM users WHERE id = 'user_sarah_lin') AS users,
         (SELECT COUNT(*) FROM brand_memberships WHERE brand_id = 'brand_novacart') AS memberships,
@@ -124,14 +159,15 @@ export async function runMigration({ dryRun = false } = {}) {
         (SELECT COUNT(*) FROM tickets WHERE brand_id = 'brand_novacart') AS tickets,
         (SELECT COUNT(*) FROM conversation_mappings WHERE brand_id = 'brand_novacart') AS mappings,
         (SELECT COUNT(*) FROM message_archive WHERE brand_id = 'brand_novacart') AS archived_messages,
-        (SELECT COUNT(*) FROM orders WHERE currency != 'USD') AS non_usd_orders
+        (SELECT COUNT(*) FROM orders WHERE currency != 'USD') AS non_usd_orders,
+        (SELECT COUNT(*) FROM agent_profiles WHERE brand_id = 'brand_novacart') AS agent_profiles
     `);
 
     const audit = auditRes.rows[0];
 
-    // Verify all 17 public tables in catalog
+    // Verify all canonical public tables in catalog
     const tablesRes = await client.query(`
-      SELECT tablename FROM pg_catalog.pg_tables 
+      SELECT tablename FROM pg_catalog.pg_tables
       WHERE schemaname = 'public' AND tablename != '_schema_migrations'
       ORDER BY tablename ASC;
     `);

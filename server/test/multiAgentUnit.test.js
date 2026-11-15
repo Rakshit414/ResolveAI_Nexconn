@@ -287,45 +287,104 @@ test('Resolve AI — Multi-Agent System Core Architecture & Invariant Unit Tests
     assert.strictEqual(failingQueries[failingQueries.length - 1], 'ROLLBACK', 'Failed transaction must issue ROLLBACK');
   });
 
-  await t.test('9. TLS certificate verification for external production connections and exact hostname matching', () => {
-    // 9a: Exact hostname parsing: localhost, 127.0.0.1, ::1
-    assert.strictEqual(parseHostnameFromUrl('postgresql://postgres:password@localhost:5432/postgres'), 'localhost');
-    assert.strictEqual(parseHostnameFromUrl('postgresql://postgres:password@127.0.0.1:5432/postgres'), '127.0.0.1');
-    assert.strictEqual(parseHostnameFromUrl('postgresql://postgres:password@[::1]:5432/postgres'), '::1');
-    assert.strictEqual(isLocalhostDatabase('postgresql://postgres:password@localhost:5432/postgres'), true);
-    assert.strictEqual(isLocalhostDatabase('postgresql://postgres:password@127.0.0.1:5432/postgres'), true);
-    assert.strictEqual(isLocalhostDatabase('postgresql://postgres:password@[::1]:5432/postgres'), true);
+  await t.test('9. Explicit SSL connection modes, exact localhost matching, and safe Render configuration', () => {
+    const origSslMode = process.env.DATABASE_SSL_MODE;
+    const origRender = process.env.RENDER;
+    const origCaCert = process.env.PG_CA_CERT;
 
-    // Localhost connections do not require TLS
-    assert.strictEqual(getSslConfigForUrl('postgresql://postgres:password@localhost:5432/postgres'), false);
-    assert.strictEqual(getSslConfigForUrl('postgresql://postgres:password@127.0.0.1:5432/postgres'), false);
-    assert.strictEqual(getSslConfigForUrl('postgresql://postgres:password@[::1]:5432/postgres'), false);
+    try {
+      delete process.env.DATABASE_SSL_MODE;
+      delete process.env.RENDER;
+      delete process.env.PG_CA_CERT;
 
-    // 9b: Substring lookalikes must NOT match localhost and must enforce verified TLS
-    const lookalikes = [
-      'postgresql://postgres:password@localhost.attacker.com:5432/postgres',
-      'postgresql://postgres:password@evil-127.0.0.1.attacker.com:5432/postgres',
-      'postgresql://postgres:password@attacker::1.com:5432/postgres'
-    ];
-    for (const lookalike of lookalikes) {
-      assert.strictEqual(isLocalhostDatabase(lookalike), false, `Lookalike ${lookalike} must not be treated as localhost`);
-      const lookalikeSsl = getSslConfigForUrl(lookalike);
-      assert.ok(lookalikeSsl && typeof lookalikeSsl === 'object');
-      assert.strictEqual(lookalikeSsl.rejectUnauthorized, true, `Lookalike ${lookalike} must enforce rejectUnauthorized: true`);
+      // 9a: Exact hostname parsing: localhost, 127.0.0.1, ::1
+      assert.strictEqual(parseHostnameFromUrl('postgresql://postgres:password@localhost:5432/postgres'), 'localhost');
+      assert.strictEqual(parseHostnameFromUrl('postgresql://postgres:password@127.0.0.1:5432/postgres'), '127.0.0.1');
+      assert.strictEqual(parseHostnameFromUrl('postgresql://postgres:password@[::1]:5432/postgres'), '::1');
+      assert.strictEqual(isLocalhostDatabase('postgresql://postgres:password@localhost:5432/postgres'), true);
+      assert.strictEqual(isLocalhostDatabase('postgresql://postgres:password@127.0.0.1:5432/postgres'), true);
+      assert.strictEqual(isLocalhostDatabase('postgresql://postgres:password@[::1]:5432/postgres'), true);
+
+      // Localhost connections preserve local development behavior (no TLS required)
+      assert.strictEqual(getSslConfigForUrl('postgresql://postgres:password@localhost:5432/postgres'), false);
+      assert.strictEqual(getSslConfigForUrl('postgresql://postgres:password@127.0.0.1:5432/postgres'), false);
+      assert.strictEqual(getSslConfigForUrl('postgresql://postgres:password@[::1]:5432/postgres'), false);
+
+      // 9b: Substring lookalikes must NOT match localhost and default to verified TLS
+      const lookalikes = [
+        'postgresql://postgres:password@localhost.attacker.com:5432/postgres',
+        'postgresql://postgres:password@evil-127.0.0.1.attacker.com:5432/postgres',
+        'postgresql://postgres:password@attacker::1.com:5432/postgres'
+      ];
+      for (const lookalike of lookalikes) {
+        assert.strictEqual(isLocalhostDatabase(lookalike), false, `Lookalike ${lookalike} must not be treated as localhost`);
+        const lookalikeSsl = getSslConfigForUrl(lookalike);
+        assert.ok(lookalikeSsl && typeof lookalikeSsl === 'object');
+        assert.strictEqual(lookalikeSsl.rejectUnauthorized, true, `Lookalike ${lookalike} must enforce rejectUnauthorized: true`);
+      }
+
+      // 9c: Render Internal URL with explicitly configured disable mode
+      const renderInternalUrl = 'postgresql://testuser:password@dpg-mock-instance-a:5432/testdb';
+      process.env.DATABASE_SSL_MODE = 'disable';
+      assert.strictEqual(getSslConfigForUrl(renderInternalUrl), false, 'DATABASE_SSL_MODE=disable must return false');
+
+      // 9d: Render External URL with explicitly configured require mode
+      const renderExternalUrl = 'postgresql://testuser:password@dpg-mock-instance.oregon-postgres.render.com:5432/testdb?sslmode=require';
+      process.env.DATABASE_SSL_MODE = 'require';
+      const requireSsl = getSslConfigForUrl(renderExternalUrl);
+      assert.ok(requireSsl && typeof requireSsl === 'object');
+      assert.strictEqual(requireSsl.rejectUnauthorized, false, 'DATABASE_SSL_MODE=require must return rejectUnauthorized: false');
+
+      // 9e: Generic remote PostgreSQL defaults to verified TLS
+      delete process.env.DATABASE_SSL_MODE;
+      const genericRemoteUrl = 'postgresql://testuser:password@db.example.com:5432/testdb';
+      assert.strictEqual(isLocalhostDatabase(genericRemoteUrl), false);
+      const defaultRemoteSsl = getSslConfigForUrl(genericRemoteUrl);
+      assert.ok(defaultRemoteSsl && typeof defaultRemoteSsl === 'object');
+      assert.strictEqual(defaultRemoteSsl.rejectUnauthorized, true, 'Remote connections must default to verified TLS');
+
+      // Explicit verify mode also enforces verified TLS
+      process.env.DATABASE_SSL_MODE = 'verify';
+      const verifySsl = getSslConfigForUrl(genericRemoteUrl);
+      assert.strictEqual(verifySsl.rejectUnauthorized, true);
+      delete process.env.DATABASE_SSL_MODE;
+
+      // Custom CA bundle is included in verify mode
+      process.env.PG_CA_CERT = '-----BEGIN CERTIFICATE-----\nMOCK\n-----END CERTIFICATE-----';
+      const sslWithCa = getSslConfigForUrl(genericRemoteUrl);
+      assert.strictEqual(sslWithCa.rejectUnauthorized, true);
+      assert.strictEqual(sslWithCa.ca, process.env.PG_CA_CERT);
+      delete process.env.PG_CA_CERT;
+
+      // 9f: Invalid DATABASE_SSL_MODE values fail closed with clear error
+      process.env.DATABASE_SSL_MODE = 'invalid_mode';
+      assert.throws(() => {
+        getSslConfigForUrl(genericRemoteUrl);
+      }, /Invalid DATABASE_SSL_MODE: "invalid_mode"/);
+
+      process.env.DATABASE_SSL_MODE = 'foo';
+      assert.throws(() => {
+        getSslConfigForUrl(renderInternalUrl);
+      }, /Invalid DATABASE_SSL_MODE: "foo"/);
+      delete process.env.DATABASE_SSL_MODE;
+
+      // 9g: dpg- hostnames alone do NOT establish Render identity (defaults to verified TLS)
+      const dpgRemoteUrl = 'postgresql://testuser:password@dpg-mock-instance-a:5432/testdb';
+      const dpgDefaultSsl = getSslConfigForUrl(dpgRemoteUrl);
+      assert.ok(dpgDefaultSsl && typeof dpgDefaultSsl === 'object');
+      assert.strictEqual(dpgDefaultSsl.rejectUnauthorized, true, 'dpg- hostnames alone must NOT disable or relax verification');
+
+      // 9h: RENDER=true alone does NOT disable verification
+      process.env.RENDER = 'true';
+      const renderEnvSsl = getSslConfigForUrl(genericRemoteUrl);
+      assert.ok(renderEnvSsl && typeof renderEnvSsl === 'object');
+      assert.strictEqual(renderEnvSsl.rejectUnauthorized, true, 'RENDER=true alone must NOT disable verification');
+      delete process.env.RENDER;
+
+    } finally {
+      if (origSslMode !== undefined) process.env.DATABASE_SSL_MODE = origSslMode; else delete process.env.DATABASE_SSL_MODE;
+      if (origRender !== undefined) process.env.RENDER = origRender; else delete process.env.RENDER;
+      if (origCaCert !== undefined) process.env.PG_CA_CERT = origCaCert; else delete process.env.PG_CA_CERT;
     }
-
-    // 9c: External / Remote database URLs (e.g. Render) must enforce rejectUnauthorized: true
-    const renderExternalUrl = 'postgresql://testuser:password@dpg-mock-instance.oregon-postgres.render.com:5432/testdb?sslmode=require';
-    assert.strictEqual(isLocalhostDatabase(renderExternalUrl), false);
-    const sslConfig = getSslConfigForUrl(renderExternalUrl);
-    assert.ok(sslConfig && typeof sslConfig === 'object');
-    assert.strictEqual(sslConfig.rejectUnauthorized, true, 'rejectUnauthorized must be true for external database connections');
-
-    // 9d: Custom CA bundle is included when provided
-    process.env.PG_CA_CERT = '-----BEGIN CERTIFICATE-----\nMOCK\n-----END CERTIFICATE-----';
-    const sslWithCa = getSslConfigForUrl(renderExternalUrl);
-    assert.strictEqual(sslWithCa.rejectUnauthorized, true);
-    assert.strictEqual(sslWithCa.ca, process.env.PG_CA_CERT);
-    delete process.env.PG_CA_CERT;
   });
 });

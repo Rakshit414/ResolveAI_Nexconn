@@ -39,6 +39,26 @@ export function getSslConfigForUrl(databaseUrl) {
   if (!databaseUrl) return false;
   if (isLocalhostDatabase(databaseUrl)) return false;
 
+  const rawMode = process.env.DATABASE_SSL_MODE;
+  if (rawMode !== undefined && rawMode !== null && rawMode !== '') {
+    const mode = String(rawMode).trim().toLowerCase();
+    if (mode === 'disable') {
+      return false;
+    }
+    if (mode === 'require') {
+      return { rejectUnauthorized: false };
+    }
+    if (mode === 'verify') {
+      const caCert = process.env.PG_CA_CERT || process.env.DATABASE_CA_CERT;
+      return {
+        rejectUnauthorized: true,
+        ...(caCert ? { ca: caCert } : {})
+      };
+    }
+    throw new Error(`[DB Pool] Invalid DATABASE_SSL_MODE: "${rawMode}". Allowed values are "disable", "require", or "verify".`);
+  }
+
+  // Generic remote PostgreSQL default: Verified TLS against standard/custom root CA
   const caCert = process.env.PG_CA_CERT || process.env.DATABASE_CA_CERT;
   return {
     rejectUnauthorized: true,

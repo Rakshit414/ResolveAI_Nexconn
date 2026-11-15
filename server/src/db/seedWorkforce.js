@@ -5,7 +5,7 @@ export function isValidBcryptHash(hash) {
   return typeof hash === 'string' && /^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$/.test(hash);
 }
 
-export function getAgentPasswordHash(userId, fallbackHash = null) {
+export function getAgentPasswordHash(userId, fallbackHash = null, isProduction = (process.env.NODE_ENV === 'production')) {
   const envMap = {
     'user_sarah_lin': process.env.AGENT_SARAH_PASSWORD_HASH,
     'user_carlos': process.env.AGENT_CARLOS_PASSWORD_HASH,
@@ -21,7 +21,7 @@ export function getAgentPasswordHash(userId, fallbackHash = null) {
   }
 
   // In production, missing environment variables must fail explicitly
-  if (process.env.NODE_ENV === 'production') {
+  if (isProduction) {
     throw new Error(`[seedWorkforce] Missing required environment variable for ${userId}. Password hashes must be explicitly supplied in production.`);
   }
 
@@ -31,6 +31,49 @@ export function getAgentPasswordHash(userId, fallbackHash = null) {
   }
 
   throw new Error(`[seedWorkforce] Missing valid password hash for ${userId}`);
+}
+
+/**
+ * Resolves and validates password hashes for all demo agents before any database operations.
+ * - Validates format of each hash using isValidBcryptHash.
+ * - In production, rejects if any hash is missing or invalid.
+ * - In production (or when individual hashes are supplied), rejects if any two hashes are identical.
+ * - Preserves development fallback when environment variables are not supplied in non-production.
+ * - Never prints or logs credential values or hashes.
+ */
+export function resolveAndValidateWorkforceHashes(isProduction = (process.env.NODE_ENV === 'production')) {
+  const resolvedHashes = {};
+  let anyUsedFallback = false;
+
+  const envMap = {
+    'user_sarah_lin': process.env.AGENT_SARAH_PASSWORD_HASH,
+    'user_carlos': process.env.AGENT_CARLOS_PASSWORD_HASH,
+    'user_elena': process.env.AGENT_ELENA_PASSWORD_HASH,
+  };
+
+  for (const agent of DEMO_AGENTS) {
+    if (!envMap[agent.userId] && !isProduction) {
+      anyUsedFallback = true;
+    }
+
+    const fallback = isProduction ? null : agent.passwordHash;
+    const hash = getAgentPasswordHash(agent.userId, fallback, isProduction);
+    if (!hash || !isValidBcryptHash(hash)) {
+      throw new Error(`[seedWorkforce] Missing or invalid bcrypt hash for ${agent.userId}`);
+    }
+    resolvedHashes[agent.userId] = hash;
+  }
+
+  // Reject provisioning if any two hashes are identical (in production or when individual hashes are supplied)
+  if (isProduction || !anyUsedFallback) {
+    const hashList = Object.values(resolvedHashes);
+    const uniqueHashes = new Set(hashList);
+    if (uniqueHashes.size !== hashList.length) {
+      throw new Error('[seedWorkforce] Duplicate password hashes detected. All three demo agents must have distinct credentials in production.');
+    }
+  }
+
+  return resolvedHashes;
 }
 
 export const DEMO_AGENTS = [
@@ -46,7 +89,7 @@ export const DEMO_AGENTS = [
     skills: ['general_inquiry', 'returns', 'logistics', 'damages'],
     maxConcurrentTickets: 3,
     avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80',
-    passwordHash: getAgentPasswordHash('user_sarah_lin', '$2b$10$aX/P2ZbWKxWVNqUzSYZcq.MRg4nQLiV8hHS6faZE0nOeZHu8u73oe')
+    passwordHash: '$2b$10$aX/P2ZbWKxWVNqUzSYZcq.MRg4nQLiV8hHS6faZE0nOeZHu8u73oe'
   },
   {
     userId: 'user_carlos',
@@ -60,7 +103,7 @@ export const DEMO_AGENTS = [
     skills: ['returns', 'billing', 'logistics'],
     maxConcurrentTickets: 3,
     avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80',
-    passwordHash: getAgentPasswordHash('user_carlos', '$2b$10$aX/P2ZbWKxWVNqUzSYZcq.MRg4nQLiV8hHS6faZE0nOeZHu8u73oe')
+    passwordHash: '$2b$10$aX/P2ZbWKxWVNqUzSYZcq.MRg4nQLiV8hHS6faZE0nOeZHu8u73oe'
   },
   {
     userId: 'user_elena',
@@ -74,7 +117,7 @@ export const DEMO_AGENTS = [
     skills: ['general_inquiry', 'damages', 'escalations'],
     maxConcurrentTickets: 3,
     avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=150&q=80',
-    passwordHash: getAgentPasswordHash('user_elena', '$2b$10$aX/P2ZbWKxWVNqUzSYZcq.MRg4nQLiV8hHS6faZE0nOeZHu8u73oe')
+    passwordHash: '$2b$10$aX/P2ZbWKxWVNqUzSYZcq.MRg4nQLiV8hHS6faZE0nOeZHu8u73oe'
   }
 ];
 
@@ -84,6 +127,9 @@ export const DEMO_AGENTS = [
  * Never leaves partially provisioned agents if any step fails.
  */
 export async function seedDemoWorkforce(clientOrPool = null, brandId = 'brand_novacart') {
+  // 1. Resolve and validate all three credentials before executing queries or acquiring connections
+  const resolvedHashes = resolveAndValidateWorkforceHashes();
+
   const pool = clientOrPool || getPool();
   if (!pool) return;
 
@@ -95,7 +141,7 @@ export async function seedDemoWorkforce(clientOrPool = null, brandId = 'brand_no
     if (shouldManageTx) await client.query('BEGIN');
 
     for (const agent of DEMO_AGENTS) {
-      const resolvedHash = getAgentPasswordHash(agent.userId, agent.passwordHash);
+      const resolvedHash = resolvedHashes[agent.userId];
 
       // 1. Idempotently upsert user, ensuring password_hash is updated if changed
       await client.query(`
@@ -174,6 +220,7 @@ export async function seedDemoWorkforce(clientOrPool = null, brandId = 'brand_no
 export default {
   isValidBcryptHash,
   getAgentPasswordHash,
+  resolveAndValidateWorkforceHashes,
   DEMO_AGENTS,
   seedDemoWorkforce
 };

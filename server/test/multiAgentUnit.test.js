@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import bcrypt from 'bcryptjs';
-import { DEMO_AGENTS, isValidBcryptHash, getAgentPasswordHash, seedDemoWorkforce } from '../src/db/seedWorkforce.js';
+import { DEMO_AGENTS, isValidBcryptHash, getAgentPasswordHash, resolveAndValidateWorkforceHashes, seedDemoWorkforce } from '../src/db/seedWorkforce.js';
 import { calculateEffectiveStatus } from '../src/services/agentAvailabilityService.js';
 import { maskCustomerPii } from '../src/services/sharedInboxService.js';
 import { DEMO_AGENTS_LIST } from '../../client/src/data/demoData.js';
@@ -170,18 +170,23 @@ test('Resolve AI — Multi-Agent System Core Architecture & Invariant Unit Tests
     assert.strictEqual(isElenaEligible, false, 'Elena at capacity must be ineligible');
   });
 
-  await t.test('7. seedWorkforce bcrypt validation, individual env var mapping, and fail-closed security', () => {
+  await t.test('7. seedWorkforce bcrypt validation, distinct production credentials, and fail-closed security', async () => {
     // Hash format validation
-    const validHash = '$2b$10$aX/P2ZbWKxWVNqUzSYZcq.MRg4nQLiV8hHS6faZE0nOeZHu8u73oe';
-    assert.strictEqual(isValidBcryptHash(validHash), true);
+    const validHash1 = '$2b$10$aX/P2ZbWKxWVNqUzSYZcq.MRg4nQLiV8hHS6faZE0nOeZHu8u73oe';
+    const validHash2 = '$2b$10$bY/P2ZbWKxWVNqUzSYZcq.MRg4nQLiV8hHS6faZE0nOeZHu8u73oe';
+    const validHash3 = '$2b$10$cZ/P2ZbWKxWVNqUzSYZcq.MRg4nQLiV8hHS6faZE0nOeZHu8u73oe';
+
+    assert.strictEqual(isValidBcryptHash(validHash1), true);
+    assert.strictEqual(isValidBcryptHash(validHash2), true);
+    assert.strictEqual(isValidBcryptHash(validHash3), true);
     assert.strictEqual(isValidBcryptHash('plaintext_password'), false);
     assert.strictEqual(isValidBcryptHash('$2b$10$too_short'), false);
     assert.strictEqual(isValidBcryptHash(null), false);
 
     // Environment variable overrides
-    process.env.AGENT_SARAH_PASSWORD_HASH = validHash;
+    process.env.AGENT_SARAH_PASSWORD_HASH = validHash1;
     const resolvedSarah = getAgentPasswordHash('user_sarah_lin');
-    assert.strictEqual(resolvedSarah, validHash);
+    assert.strictEqual(resolvedSarah, validHash1);
     delete process.env.AGENT_SARAH_PASSWORD_HASH;
 
     // Invalid hash in env var throws clearly without fallback
@@ -196,8 +201,67 @@ test('Resolve AI — Multi-Agent System Core Architecture & Invariant Unit Tests
     process.env.NODE_ENV = 'production';
     delete process.env.AGENT_ELENA_PASSWORD_HASH;
     assert.throws(() => {
-      getAgentPasswordHash('user_elena', validHash);
+      getAgentPasswordHash('user_elena', validHash1);
     }, /Missing required environment variable/);
+
+    // 7a: Three distinct valid hashes in production pass validation
+    process.env.AGENT_SARAH_PASSWORD_HASH = validHash1;
+    process.env.AGENT_CARLOS_PASSWORD_HASH = validHash2;
+    process.env.AGENT_ELENA_PASSWORD_HASH = validHash3;
+    const resolved = resolveAndValidateWorkforceHashes();
+    assert.strictEqual(resolved.user_sarah_lin, validHash1);
+    assert.strictEqual(resolved.user_carlos, validHash2);
+    assert.strictEqual(resolved.user_elena, validHash3);
+    assert.strictEqual(new Set(Object.values(resolved)).size, 3, 'All 3 production hashes must be distinct');
+
+    // 7b: Duplicate hashes in production fail closed before any database query
+    process.env.AGENT_CARLOS_PASSWORD_HASH = validHash1; // Duplicate with Sarah
+    assert.throws(() => {
+      resolveAndValidateWorkforceHashes();
+    }, /Duplicate password hashes detected/);
+
+    const unreachedQueries = [];
+    const dummyClient = {
+      query: async (sql) => {
+        unreachedQueries.push(sql);
+        return { rowCount: 1, rows: [] };
+      }
+    };
+    await assert.rejects(async () => {
+      await seedDemoWorkforce(dummyClient, 'brand_novacart');
+    }, /Duplicate password hashes detected/);
+    assert.strictEqual(unreachedQueries.length, 0, 'No query (not even BEGIN) may execute when duplicate hashes exist');
+
+    // 7c: Missing hashes in production fail closed before any database query
+    delete process.env.AGENT_ELENA_PASSWORD_HASH;
+    assert.throws(() => {
+      resolveAndValidateWorkforceHashes();
+    }, /Missing required environment variable/);
+    await assert.rejects(async () => {
+      await seedDemoWorkforce(dummyClient, 'brand_novacart');
+    }, /Missing required environment variable/);
+    assert.strictEqual(unreachedQueries.length, 0, 'No query may execute when hashes are missing');
+
+    // 7d: Invalid hash in production fails closed before any database query
+    process.env.AGENT_ELENA_PASSWORD_HASH = 'not_a_valid_hash';
+    assert.throws(() => {
+      resolveAndValidateWorkforceHashes();
+    }, /Invalid bcrypt hash format/);
+    await assert.rejects(async () => {
+      await seedDemoWorkforce(dummyClient, 'brand_novacart');
+    }, /Invalid bcrypt hash format/);
+    assert.strictEqual(unreachedQueries.length, 0, 'No query may execute when hashes are invalid');
+
+    // 7e: Development fallback behavior is preserved when no env vars are set
+    process.env.NODE_ENV = 'development';
+    delete process.env.AGENT_SARAH_PASSWORD_HASH;
+    delete process.env.AGENT_CARLOS_PASSWORD_HASH;
+    delete process.env.AGENT_ELENA_PASSWORD_HASH;
+    const devHashes = resolveAndValidateWorkforceHashes();
+    assert.ok(devHashes.user_sarah_lin && isValidBcryptHash(devHashes.user_sarah_lin));
+    assert.ok(devHashes.user_carlos && isValidBcryptHash(devHashes.user_carlos));
+    assert.ok(devHashes.user_elena && isValidBcryptHash(devHashes.user_elena));
+
     process.env.NODE_ENV = prevEnv;
   });
 

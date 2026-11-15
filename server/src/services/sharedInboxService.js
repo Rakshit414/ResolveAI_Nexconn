@@ -422,7 +422,7 @@ export async function claimOrReassignTicket({
 
     // Step 1: Lock ticket row
     const ticketRes = await client.query(`
-      SELECT id, brand_id, assigned_agent_id, status
+      SELECT id, brand_id, customer_id, assigned_agent_id, status
       FROM tickets
       WHERE brand_id = $1 AND id = $2
       FOR UPDATE

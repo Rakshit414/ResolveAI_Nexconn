@@ -18,7 +18,23 @@ const BCP47_CANONICAL_MAP = {
   fr: 'fr-FR',
   'fr-fr': 'fr-FR',
   de: 'de-DE',
-  'de-de': 'de-DE'
+  'de-de': 'de-DE',
+  ja: 'ja-JP',
+  'ja-jp': 'ja-JP',
+  pt: 'pt-BR',
+  'pt-br': 'pt-BR',
+  'pt-pt': 'pt-PT',
+  ar: 'ar-SA',
+  'ar-sa': 'ar-SA',
+  'zh-cn': 'zh-CN',
+  'zh-hans': 'zh-CN',
+  'zh-hans-cn': 'zh-CN',
+  zh: 'zh-CN',
+  bn: 'bn-BD',
+  'bn-bd': 'bn-BD',
+  'bn-in': 'bn-IN',
+  ta: 'ta-IN',
+  'ta-in': 'ta-IN'
 };
 
 // Regex validating standard BCP 47 locale format (e.g. en, en-US, hi-IN, zh-Hans-CN)
@@ -490,6 +506,51 @@ function getFallbackTranslation(text, sourceLocale, targetLocale) {
     'mr-IN_en-US': {
       'माझी ऑर्डर कुठे आहे?': 'Where is my order?',
       'माझ्या डिलिव्हरीला उशीर का होत आहे?': 'Why is my delivery getting delayed?'
+    },
+    'en-US_es-ES': {
+      'Where is my order?': '¿Dónde está mi pedido?',
+      'Hello': 'Hola',
+      'Track my order': 'Rastrear mi pedido'
+    },
+    'en-US_de-DE': {
+      'Where is my order?': 'Wo ist meine Bestellung?',
+      'Hello': 'Hallo',
+      'Track my order': 'Meine Bestellung verfolgen'
+    },
+    'en-US_fr-FR': {
+      'Where is my order?': 'Où est ma commande ?',
+      'Hello': 'Bonjour',
+      'Track my order': 'Suivre ma commande'
+    },
+    'en-US_ja-JP': {
+      'Where is my order?': '私の注文はどこですか？',
+      'Hello': 'こんにちは',
+      'Track my order': '注文を追跡'
+    },
+    'en-US_pt-BR': {
+      'Where is my order?': 'Onde está meu pedido?',
+      'Hello': 'Olá',
+      'Track my order': 'Rastrear meu pedido'
+    },
+    'en-US_ar-SA': {
+      'Where is my order?': 'أين طلبي؟',
+      'Hello': 'مرحباً',
+      'Track my order': 'تتبع طلبي'
+    },
+    'en-US_zh-CN': {
+      'Where is my order?': '我的订单在哪里？',
+      'Hello': '你好',
+      'Track my order': '追踪我的订单'
+    },
+    'en-US_bn-BD': {
+      'Where is my order?': 'আমার অর্ডার কোথায়?',
+      'Hello': 'হ্যালো',
+      'Track my order': 'আমার অর্ডার ট্র্যাক করুন'
+    },
+    'en-US_ta-IN': {
+      'Where is my order?': 'எனது ஆர்டர் எங்கே?',
+      'Hello': 'வணக்கம்',
+      'Track my order': 'எனது ஆர்டரைக் கண்காணிக்கவும்'
     }
   };
 

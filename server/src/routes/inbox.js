@@ -167,6 +167,11 @@ router.post('/tickets/:ticketId/transfer', requireAgentAuth, async (req, res) =>
     return res.status(400).json({ error: 'toAgentId is required' });
   }
 
+  const transferReasonText = (typeof handoffSummaryJson === 'string' ? handoffSummaryJson : handoffSummaryJson?.reason) || '';
+  if (!transferReasonText.trim()) {
+    return res.status(400).json({ error: 'Transfer reason is required' });
+  }
+
   // Authorization: normal agents can only transfer tickets assigned to them
   const fromAgentId = req.body.fromAgentId || req.agent.id;
   if (fromAgentId !== req.agent.id && !['support_lead', 'admin'].includes(req.agent.role)) {

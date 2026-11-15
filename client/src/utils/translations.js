@@ -1,691 +1,54 @@
-// Localized UI strings for Resolve AI Customer Experience
-// Supported languages: English (en), Hindi (hi), Marathi (mr)
+// client/src/utils/translations.js
+import en from './locales/en.js';
+import hi from './locales/hi.js';
+import mr from './locales/mr.js';
+import es from './locales/es.js';
+import de from './locales/de.js';
+import fr from './locales/fr.js';
+import ja from './locales/ja.js';
+import pt from './locales/pt.js';
+import ar from './locales/ar.js';
+import zhCN from './locales/zhCN.js';
+import bn from './locales/bn.js';
+import ta from './locales/ta.js';
 
 export const TRANSLATIONS = {
-  en: {
-    brandName: "NovaCart Support",
-    customerExp: "Customer Experience",
-    connectionLive: "Connected",
-    viewTracking: "View tracking",
-    hideTracking: "Hide tracking",
-    statusResolved: "Resolved",
-    statusAgentActive: "Sarah Lin Active",
-    statusHumanRequested: "Human Requested",
-    statusAIHandling: "AI Handling",
-    btnRequestHuman: "Request Human",
-    quickAskPrefix: "Quick Actions:",
-    quickTrackOrder: "Track my order",
-    quickReturn: "Request a return",
-    quickDamage: "Report damaged product",
-    quickHuman: "Talk to human agent",
-    carrier: "Carrier",
-    deliveryStatus: "Delivery Status",
-    latestUpdate: "Latest Courier Update",
-    estDelivery: "Est. Delivery",
-    inputPlaceholder: "Type your message...",
-    inputResolvedPlaceholder: "Inquiry resolved · Type your message to re-open...",
-    send: "Send",
-    sending: "Sending...",
-    attachPhoto: "Attach Photo",
-    removeAttachment: "Remove",
-    downloadAttachment: "Download",
-    downloadTranscript: "Transcript",
-    fontSize: "Font Size",
-
-    // Resolution Feedback
-    feedbackTitle: "Was your issue resolved?",
-    feedbackYes: "Yes, resolved",
-    feedbackNo: "No, need more help",
-    feedbackRating: "Rate your experience:",
-    feedbackPlaceholder: "Tell us how we did...",
-    feedbackSubmit: "Submit Feedback",
-    feedbackThankYou: "Thank you for your feedback! ⭐",
-
-    // System messages
-    systemHandoff: "Customer requested human agent assistance.",
-    systemResolved: "Ticket marked as resolved. Thank you for contacting NovaCart Support!",
-    photoAttached: "Evidence photograph attached",
-    viewTranslation: "Translate to English",
-    originalMessage: "Original Message:",
-    translationLabel: "English Translation:",
-    translating: "Translating...",
-
-    // Customer Identity & Initial Experience
-    welcomeAarav: "Hello, Aarav. Welcome to NovaCart Support.",
-    welcomePriya: "Hello, Priya. How can we help you today?",
-    welcomeKabir: "Hello, Kabir. We're here to help.",
-    welcomeDefault: "Welcome to NovaCart Support.",
-    supportIntro: "We're here to assist with your order, returns, delivery updates, and any questions.",
-    supportLiveBadge: "Support Online · 24/7 AI & Agent Assistance",
-    orderOverviewTitle: "Your Recent Order",
-    orderedOn: "Ordered on",
-    deliveredOn: "Delivered on",
-    orderStatusLabel: "Status",
-    viewOrderAction: "Track Order",
-    hideOrderAction: "Hide Tracking",
-    supportOptionsTitle: "How can we help you today?",
-    actionTrack: "Track an order",
-    actionTrackSub: "Live courier tracking",
-    actionReturn: "Request a return or refund",
-    actionReturnSub: "7-day refund policy",
-    actionDamage: "Report a damaged or incorrect product",
-    actionDamageSub: "Attach photo proof",
-    actionQuestion: "Ask a question",
-    actionQuestionSub: "AI instant answers",
-    actionHuman: "Connect with a human agent",
-    actionHumanSub: "Connect to Sarah Lin",
-    chatEntryTitle: "How can we help?",
-    chatEntrySub: "Ask anything about your order",
-    suggestedQuestionsTitle: "Suggested for your order:",
-    welcomeBack: "Welcome back",
-    viewWelcomeOverview: "View Order Overview",
-    backToConversation: "Back to Conversation",
-    demoSelectorLabel: "Demo:",
-
-    // Storefront UI Translations (English)
-    storefront: {
-      nav: {
-        officialStore: "Official Store",
-        searchPlaceholder: "Search performance footwear, smart gear, audio...",
-        switchCustomer: "Switch Demo Customer",
-        storefront: "Storefront",
-        customer: "Customer",
-        agent: "Agent",
-        splitView: "Split View",
-        cart: "Cart",
-        shoppingBag: "Shopping Bag",
-        policies: "Policies",
-        selectLanguage: "Language",
-      },
-      announcement: {
-        freeShipping: "⚡ FREE EXPRESS SHIPPING OVER $75 • 7-DAY HASSLE-FREE RETURNS",
-        aiResolution: "24/7 AI-Assisted Resolution",
-        embedSnippet: "Embed Widget Snippet",
-      },
-      hero: {
-        collectionBadge: "Spring Performance 2026 Collection",
-        titleLine1: "Engineered for Movement.",
-        titleLine2: "Backed by Real-Time AI Support.",
-        subtitle: "Experience responsive running footwear, titanium smart wearables, and hybrid ANC audio. Seamlessly integrated with Resolve AI for zero-wait parcel tracking, instant replacements, and human escalation.",
-        shopFootwear: "Shop Footwear",
-        trackShipment: "Track Existing Shipment",
-        dispatchDelivery: "4–6 Day Delivery",
-        returnWindow: "7-Day Return Window",
-        verifiedResolution: "Verified AI Resolution",
-        featuredBadge: "Featured",
-        delayedTransit: "Delayed in transit?",
-        askSupportAi: "Ask Support AI",
-      },
-      tracker: {
-        badge: "Live Courier Tracking & Resolution",
-        title: "Track Your NovaCart Shipment",
-        demoOrders: "Demo Orders:",
-        carrier: "Carrier",
-        trackingCode: "Tracking Code:",
-        status: "Status:",
-        launchSupport: "Launch Support Chat",
-        preloadsContext: "Pre-loads order context directly into Resolve AI",
-      },
-      catalog: {
-        title: "NovaCart Product Catalog",
-        subtitle: "Select any item to view specifications or inquire with conversational support",
-        categories: {
-          All: "All",
-          Footwear: "Footwear",
-          Wearables: "Wearables",
-          Audio: "Audio",
-          Accessories: "Accessories",
-        },
-        reviews: "reviews",
-        option: "Option:",
-        inStock: "In Stock",
-        addToCart: "Add to Cart",
-        added: "Added ✓",
-        inquireAi: "Inquire AI",
-        badges: {
-          bestSeller: "Best Seller",
-          staffFavorite: "Staff Favorite",
-          noiseCancelling: "Noise Cancelling",
-          inStock: "In Stock",
-          threePack: "3-Pack",
-          fastCharging: "Fast 15W",
-        }
-      },
-      guarantees: {
-        badge: "NovaCart Trust & Support Guarantees",
-        title: "Automated Policy Enforcement",
-        subtitle: "Every policy rule is directly evaluated by Resolve AI to provide consistent, audit-compliant resolutions.",
-        dispatchTitle: "4–6 Days Dispatch",
-        dispatchDesc: "Standard delivery within 4–6 business days with verified FedEx, UPS, or DHL tracking updates.",
-        returnTitle: "7-Day Return Window",
-        returnDesc: "Initiate hassle-free returns within 7 calendar days of confirmed delivery for immediate refund review.",
-        damagedTitle: "Damaged Item Replacement",
-        damagedDesc: "Damaged or incorrect shipments qualify for instant free replacement upon photo proof verification.",
-        humanTitle: "Human Agent Escalation",
-        humanDesc: "One-click handoff to Senior Support Specialist Sarah Lin with full context & conversation history.",
-      },
-      embedBanner: {
-        title: "Integrate Resolve AI on Your Own Storefront",
-        subtitle: "Embeddable support widget powered by PostgreSQL, Gemini AI, and Nexconn real-time messaging.",
-        viewSnippet: "View Script Snippet & Theming",
-      },
-      footer: {
-        copyright: "© 2026 NovaCart Inc. All rights reserved. Powered by Resolve AI Support Suite.",
-        privacy: "Privacy",
-        terms: "Terms of Service",
-        security: "Security",
-      },
-      cart: {
-        headingCart: "Your Shopping Bag",
-        headingCheckout: "Demo Checkout",
-        headingConfirmed: "Order Confirmed",
-        itemsInBag: "items in bag",
-        itemInBag: "item in bag",
-        officialStore: "NovaCart Official Store",
-        freeShippingUnlocked: "You unlocked FREE Express Shipping!",
-        addMoreForFreeShipping: "more for FREE Shipping",
-        addPrefix: "Add",
-        emptyTitle: "Your bag is empty",
-        emptyDesc: "Explore our performance apparel, wireless charging gear, and noise-cancelling audio.",
-        continueShopping: "Continue Shopping",
-        itemsSubtotal: "Items Subtotal",
-        shippingExpress: "Shipping (Express 2-3 Days)",
-        free: "FREE",
-        estimatedTax: "Estimated Sales Tax (8%)",
-        total: "Total",
-        grandTotal: "Grand Total",
-        proceedCheckout: "Proceed to Demo Checkout",
-        clearBag: "Clear Bag",
-        simulatedNoticeTitle: "Simulated Checkout",
-        simulatedNoticeDesc: "This is a demonstration store. No real payment or credit card is processed.",
-        shippingInfoTitle: "Shipping Information",
-        autoFillDemo: "Auto-fill Demo Details",
-        fullName: "Full Name",
-        emailAddress: "Email Address",
-        shippingAddress: "Shipping Address",
-        city: "City",
-        postalCode: "Postal Code",
-        deliveryMethod: "Delivery Method",
-        fedexPriority: "FedEx Priority Express",
-        estimatedDays: "Estimated 2–3 Business Days",
-        orderSummary: "Order Summary",
-        completeOrder: "Complete Demo Order",
-        returnToBag: "← Return to Shopping Bag",
-        confirmedTitle: "Order Confirmed!",
-        confirmedThankYou: "Your demonstration order has been created.",
-        orderNumberLabel: "Order Number",
-        carrierLabel: "Carrier",
-        deliveryTargetLabel: "Delivery Target:",
-        trackingCodeLabel: "Tracking Code:",
-        itemsCountLabel: "Items Count:",
-        amountPaidLabel: "Amount Paid:",
-        resolveAiTitle: "Resolve AI Support Integration",
-        resolveAiDesc: "Have questions about delivery times or order details? Chat instantly with our AI copilot or escalate to human specialists.",
-        trackWithAssistant: "Track with Resolve AI Assistant",
-      }
-    },
-  },
-
-  hi: {
-    brandName: "नोवाकार्ट सपोर्ट",
-    customerExp: "ग्राहक अनुभव",
-    connectionLive: "सक्रिय जुड़ाव",
-    viewTracking: "ट्रैकिंग देखें",
-    hideTracking: "ट्रैकिंग छिपाएं",
-    statusResolved: "समाधान हुआ",
-    statusAgentActive: "सारा लिन सक्रिय",
-    statusHumanRequested: "मानव सहायता मांगी",
-    statusAIHandling: "एआई हैंडलिंग",
-    btnRequestHuman: "मानव एजेंट से बात करें",
-    quickAskPrefix: "त्वरित क्रियाएँ:",
-    quickTrackOrder: "ऑर्डर ट्रैक करें",
-    quickReturn: "वापसी का अनुरोध करें",
-    quickDamage: "क्षतिग्रस्त उत्पाद की रिपोर्ट करें",
-    quickHuman: "मानव एजेंट से बात करें",
-    carrier: "कूरियर",
-    deliveryStatus: "वितरण स्थिति",
-    latestUpdate: "नवीनतम कूरियर अपडेट",
-    estDelivery: "अनुमानित वितरण",
-    inputPlaceholder: "अपना संदेश लिखें...",
-    inputResolvedPlaceholder: "समाधान हुआ · पुनः खोलने के लिए संदेश लिखें...",
-    send: "भेजें",
-    sending: "भेज रहे हैं...",
-    attachPhoto: "फ़ोटो संलग्न करें",
-    removeAttachment: "हटाएं",
-    downloadAttachment: "डाउनलोड",
-    downloadTranscript: "ट्रांसक्रिप्ट",
-    fontSize: "फ़ॉन्ट आकार",
-
-    // Resolution Feedback
-    feedbackTitle: "क्या आपकी समस्या का समाधान हो गया?",
-    feedbackYes: "हाँ, समाधान हुआ",
-    feedbackNo: "नहीं, और मदद चाहिए",
-    feedbackRating: "अपना अनुभव रेट करें:",
-    feedbackPlaceholder: "बताएं कि सहायता कैसी रही...",
-    feedbackSubmit: "प्रतिक्रिया सबमिट करें",
-    feedbackThankYou: "आपकी प्रतिक्रिया के लिए धन्यवाद! ⭐",
-
-    // System messages
-    systemHandoff: "ग्राहक ने मानव एजेंट सहायता का अनुरोध किया।",
-    systemResolved: "टिकट का समाधान हो गया। नोवाकार्ट सपोर्ट से संपर्क करने के लिए धन्यवाद!",
-    photoAttached: "प्रमाण फ़ोटो संलग्न की गई",
-    viewTranslation: "हिन्दी में अनुवाद देखें",
-    originalMessage: "मूल संदेश:",
-    translationLabel: "हिन्दी अनुवाद:",
-    translating: "अनुवाद हो रहा है...",
-
-    // Customer Identity & Initial Experience
-    welcomeAarav: "नमस्ते आरव। नोवाकार्ट सहायता में आपका स्वागत है।",
-    welcomePriya: "नमस्ते प्रिया। आज हम आपकी क्या सहायता कर सकते हैं?",
-    welcomeKabir: "नमस्ते कबीर। हम आपकी सहायता के लिए यहाँ हैं।",
-    welcomeDefault: "नोवाकार्ट सहायता में आपका स्वागत है।",
-    supportIntro: "हम आपके ऑर्डर, वापसी, डिलीवरी अपडेट और किसी भी प्रश्न में सहायता के लिए यहाँ हैं।",
-    supportLiveBadge: "सक्रिय सहायता · 24/7 एआई एवं एजेंट सेवा",
-    orderOverviewTitle: "आपका हालिया ऑर्डर",
-    orderedOn: "ऑर्डर तिथि",
-    deliveredOn: "वितरण तिथि",
-    orderStatusLabel: "स्थिति",
-    viewOrderAction: "ऑर्डर ट्रैक करें",
-    hideOrderAction: "ट्रैकिंग छिपाएं",
-    supportOptionsTitle: "आज हम आपकी क्या मदद कर सकते हैं?",
-    actionTrack: "ऑर्डर ट्रैक करें",
-    actionTrackSub: "लाइव कूरियर ट्रैकिंग",
-    actionReturn: "वापसी या रिफंड का अनुरोध करें",
-    actionReturnSub: "7-दिवसीय रिफंड नीति",
-    actionDamage: "क्षतिग्रस्त या गलत उत्पाद की रिपोर्ट करें",
-    actionDamageSub: "प्रमाण फोटो संलग्न करें",
-    actionQuestion: "प्रश्न पूछें",
-    actionQuestionSub: "एआई तुरंत उत्तर",
-    actionHuman: "मानव एजेंट से जुड़ें",
-    actionHumanSub: "सारा लिन से जुड़ें",
-    chatEntryTitle: "हम आपकी क्या सहायता कर सकते हैं?",
-    chatEntrySub: "अपने ऑर्डर के बारे में कुछ भी पूछें",
-    suggestedQuestionsTitle: "आपके ऑर्डर के लिए सुझाए गए प्रश्न:",
-    welcomeBack: "वापसी पर स्वागत है",
-    viewWelcomeOverview: "ऑर्डर विवरण देखें",
-    backToConversation: "बातचीत पर लौटें",
-    demoSelectorLabel: "डेमो:",
-
-    // Storefront UI Translations (Hindi)
-    storefront: {
-      nav: {
-        officialStore: "आधिकारिक स्टोर",
-        searchPlaceholder: "स्पोर्ट्स जूते, स्मार्ट वियरेबल्स, ऑडियो खोजें...",
-        switchCustomer: "डेमो ग्राहक बदलें",
-        storefront: "स्टोरफ़्रंट",
-        customer: "ग्राहक",
-        agent: "एजेंट",
-        splitView: "स्प्लिट व्यू",
-        cart: "कार्ट",
-        shoppingBag: "शॉपिंग बैग",
-        policies: "नीतियां",
-        selectLanguage: "भाषा",
-      },
-      announcement: {
-        freeShipping: "⚡ $75 से अधिक पर निःशुल्क एक्सप्रेस शिपिंग • 7 दिनों में आसान वापसी",
-        aiResolution: "24/7 एआई-सहायता प्राप्त त्वरित समाधान",
-        embedSnippet: "विजेट कोड स्निपेट",
-      },
-      hero: {
-        collectionBadge: "स्प्रिंग परफॉर्मेंस 2026 संग्रह",
-        titleLine1: "सक्रिय गतिशीलता के लिए निर्मित।",
-        titleLine2: "रीयल-टाइम एआई सहायता से सुरक्षित।",
-        subtitle: "प्रतिक्रियाशील रनिंग फुटवियर, टाइटेनियम स्मार्टवॉच और हाइब्रिड एएनसी ऑडियो का अनुभव करें। शून्य-प्रतीक्षा पार्सल ट्रैकिंग और तत्काल समाधान के लिए सीधे रिज़ॉल्व एआई से जुड़ा हुआ।",
-        shopFootwear: "जूते खरीदें",
-        trackShipment: "ऑर्डर ट्रैक करें",
-        dispatchDelivery: "4–6 दिनों में डिलीवरी",
-        returnWindow: "7-दिवसीय वापसी अवधि",
-        verifiedResolution: "सत्यापित एआई समाधान",
-        featuredBadge: "विशेष",
-        delayedTransit: "पार्सल में देरी हुई?",
-        askSupportAi: "एआई से पूछें",
-      },
-      tracker: {
-        badge: "लाइव कूरियर ट्रैकिंग एवं समाधान",
-        title: "अपना नोवाकार्ट शिपमेंट ट्रैक करें",
-        demoOrders: "डेमो ऑर्डर:",
-        carrier: "कूरियर",
-        trackingCode: "ट्रैकिंग कोड:",
-        status: "स्थिति:",
-        launchSupport: "सपोर्ट चैट शुरू करें",
-        preloadsContext: "ऑर्डर विवरण सीधे रिज़ॉल्व एआई में लोड करता है",
-      },
-      catalog: {
-        title: "नोवाकार्ट उत्पाद कैटलॉग",
-        subtitle: "विशिष्ट विवरण देखने या वार्तालाप सहायता से पूछताछ के लिए कोई भी वस्तु चुनें",
-        categories: {
-          All: "सभी",
-          Footwear: "जूते",
-          Wearables: "वियरेबल्स",
-          Audio: "ऑडियो",
-          Accessories: "एक्सेसरीज़",
-        },
-        reviews: "समीक्षाएं",
-        option: "विकल्प:",
-        inStock: "उपलब्ध है",
-        addToCart: "कार्ट में जोड़ें",
-        added: "जोड़ा गया ✓",
-        inquireAi: "एआई से पूछें",
-        badges: {
-          bestSeller: "बेस्ट सेलर",
-          staffFavorite: "पसंदीदा",
-          noiseCancelling: "नॉइज़ कैंसलिंग",
-          inStock: "उपलब्ध",
-          threePack: "3-पैक",
-          fastCharging: "फास्ट 15W",
-        }
-      },
-      guarantees: {
-        badge: "नोवाकार्ट विश्वास एवं सहायता गारंटी",
-        title: "स्वचालित नीति प्रवर्तन",
-        subtitle: "प्रत्येक नीति नियम का पारदर्शी एवं त्वरित समाधान के लिए रिज़ॉल्व एआई द्वारा सीधा मूल्यांकन किया जाता है।",
-        dispatchTitle: "4–6 दिनों में प्रेषण",
-        dispatchDesc: "सत्यापित FedEx, UPS, या DHL ट्रैकिंग अपडेट के साथ 4-6 कार्यदिवसों में मानक डिलीवरी।",
-        returnTitle: "7-दिवसीय वापसी अवधि",
-        returnDesc: "तत्काल रिफंड समीक्षा के लिए डिलीवरी की पुष्टि के 7 दिनों के भीतर बिना किसी झंझट के वापसी शुरू करें।",
-        damagedTitle: "क्षतिग्रस्त उत्पाद प्रतिस्थापन",
-        damagedDesc: "फोटो प्रमाण सत्यापन पर क्षतिग्रस्त या गलत शिपमेंट तत्काल मुफ्त प्रतिस्थापन के पात्र हैं।",
-        humanTitle: "मानव एजेंट हस्तांतरण",
-        humanDesc: "पूर्ण संदर्भ और बातचीत इतिहास के साथ वरिष्ठ सहायता विशेषज्ञ सारा लिन को वन-क्लिक हैंडऑफ।",
-      },
-      embedBanner: {
-        title: "अपने स्टोरफ़्रंट पर रिज़ॉल्व एआई एकीकृत करें",
-        subtitle: "PostgreSQL, Gemini AI और Nexconn रीयल-टाइम मैसेजिंग द्वारा संचालित एम्बेडेबल सपोर्ट विजेट।",
-        viewSnippet: "स्क्रिप्ट स्निपेट एवं थीमिंग देखें",
-      },
-      footer: {
-        copyright: "© 2026 नोवाकार्ट इंक. सर्वाधिकार सुरक्षित। रिज़ॉल्व एआई सपोर्ट सूट द्वारा संचालित।",
-        privacy: "गोपनीयता",
-        terms: "सेवा की शर्तें",
-        security: "सुरक्षा",
-      },
-      cart: {
-        headingCart: "आपका शॉपिंग बैग",
-        headingCheckout: "डेमो चेकआउट",
-        headingConfirmed: "ऑर्डर पुष्ट हुआ",
-        itemsInBag: "बैग में वस्तुएं",
-        itemInBag: "बैग में वस्तु",
-        officialStore: "नोवाकार्ट आधिकारिक स्टोर",
-        freeShippingUnlocked: "मुफ्त एक्सप्रेस शिपिंग अनलॉक हो गई!",
-        addMoreForFreeShipping: "और जोड़ें मुफ्त शिपिंग के लिए",
-        addPrefix: "मात्र",
-        emptyTitle: "आपका बैग खाली है",
-        emptyDesc: "हमारे परफॉर्मेंस परिधान, वायरलेस चार्जिंग गियर और नॉइज़-कैंसलिंग ऑडियो देखें।",
-        continueShopping: "खरीदारी जारी रखें",
-        itemsSubtotal: "उत्पादों का योग",
-        shippingExpress: "शिपिंग (एक्सप्रेस 2-3 दिन)",
-        free: "निःशुल्क",
-        estimatedTax: "अनुमानित बिक्री कर (8%)",
-        total: "कुल",
-        grandTotal: "अंतिम कुल योग",
-        proceedCheckout: "डेमो चेकआउट पर आगे बढ़ें",
-        clearBag: "बैग खाली करें",
-        simulatedNoticeTitle: "सिम्युलेटेड चेकआउट",
-        simulatedNoticeDesc: "यह एक प्रदर्शन स्टोर है। कोई वास्तविक भुगतान या क्रेडिट कार्ड संसाधित नहीं किया जाता है।",
-        shippingInfoTitle: "शिपिंग विवरण",
-        autoFillDemo: "डेमो विवरण स्वतः भरें",
-        fullName: "पूरा नाम",
-        emailAddress: "ईमेल पता",
-        shippingAddress: "शिपिंग का पता",
-        city: "शहर",
-        postalCode: "पिन कोड",
-        deliveryMethod: "वितरण विधि",
-        fedexPriority: "FedEx प्राथमिकता एक्सप्रेस",
-        estimatedDays: "अनुमानित 2–3 कार्य दिवस",
-        orderSummary: "ऑर्डर सारांश",
-        completeOrder: "डेमो ऑर्डर पूरा करें",
-        returnToBag: "← शॉपिंग बैग पर लौटें",
-        confirmedTitle: "ऑर्डर पुष्ट हुआ!",
-        confirmedThankYou: "आपका प्रदर्शन ऑर्डर सफलतापूर्वक दर्ज कर लिया गया है।",
-        orderNumberLabel: "ऑर्डर संख्या",
-        carrierLabel: "कूरियर",
-        deliveryTargetLabel: "वितरण लक्ष्य:",
-        trackingCodeLabel: "ट्रैकिंग कोड:",
-        itemsCountLabel: "वस्तुओं की संख्या:",
-        amountPaidLabel: "भुगतान की गई राशि:",
-        resolveAiTitle: "रिज़ॉल्व एआई सहायता एकीकरण",
-        resolveAiDesc: "डिलीवरी के समय या ऑर्डर विवरण के बारे में प्रश्न हैं? हमारे एआई कोपायलट के साथ तुरंत चैट करें या मानव विशेषज्ञ से बात करें।",
-        trackWithAssistant: "रिज़ॉल्व एआई सहायक के साथ ट्रैक करें",
-      }
-    },
-  },
-
-  mr: {
-    brandName: "नोव्हाकार्ट सपोर्ट",
-    customerExp: "ग्राहक अनुभव",
-    connectionLive: "सक्रिय जोडणी",
-    viewTracking: "ट्रॅकिंग पहा",
-    hideTracking: "ट्रॅकिंग लपवा",
-    statusResolved: "निवारण झाले",
-    statusAgentActive: "सारा लिन सक्रिय",
-    statusHumanRequested: "मानवी सहाय्य मागितले",
-    statusAIHandling: "एआय हाताळणी",
-    btnRequestHuman: "मानव एजेंट से बात करें",
-    quickAskPrefix: "त्वरित कृती:",
-    quickTrackOrder: "ऑर्डर ट्रॅक करा",
-    quickReturn: "परतावा विनंती करा",
-    quickDamage: "खराब उत्पादनाची तक्रार करा",
-    quickHuman: "मानव एजेंट से बात करें",
-    carrier: "कुरिअर",
-    deliveryStatus: "डिलिव्हरी स्थिती",
-    latestUpdate: "नवीनतम कुरिअर अपडेट",
-    estDelivery: "अपेक्षित डिलिव्हरी",
-    inputPlaceholder: "तुमचा संदेश लिहा...",
-    inputResolvedPlaceholder: "निवारण झाले · पुन्हा उघडण्यासाठी संदेश लिहा...",
-    send: "पाठवा",
-    sending: "पाठवत आहे...",
-    attachPhoto: "फोटो जोडा",
-    removeAttachment: "काढा",
-    downloadAttachment: "डाउनलोड",
-    downloadTranscript: "ट्रान्सक्रिप्ट",
-    fontSize: "फॉन्ट आकार",
-
-    // Resolution Feedback
-    feedbackTitle: "तुमच्या समस्येचे निराकरण झाले का?",
-    feedbackYes: "होय, निराकरण झाले",
-    feedbackNo: "नाही, अजून मदत हवी आहे",
-    feedbackRating: "तुमचा अनुभव रेट करा:",
-    feedbackPlaceholder: "मदत कशी वाटली ते सांगा...",
-    feedbackSubmit: "प्रतिक्रिया सबमिट करा",
-    feedbackThankYou: "तुमच्या अभिप्रायाबद्दल धन्यवाद! ⭐",
-
-    // System messages
-    systemHandoff: "ग्राहकाने मानवी एजंट सहाय्याची विनंती केली.",
-    systemResolved: "तिकिटाचे निवारण झाले. नोव्हाकार्ट सपोर्टशी संपर्क साधल्याबद्दल धन्यवाद!",
-    photoAttached: "पुराव्याचा फोटो जोडला",
-    viewTranslation: "मराठीमध्ये भाषांतर पहा",
-    originalMessage: "मूळ संदेश:",
-    translationLabel: "मराठी भाषांतर:",
-    translating: "भाषांतर होत आहे...",
-
-    // Customer Identity & Initial Experience
-    welcomeAarav: "नमस्कार आरव. नोव्हाकार्ट सपोर्टमध्ये आपले स्वागत आहे.",
-    welcomePriya: "नमस्कार प्रिया. आज आम्ही आपली काय मदत करू शकतो?",
-    welcomeKabir: "नमस्कार कबीर. आम्ही मदतीसाठी येथे आहोत.",
-    welcomeDefault: "नोव्हाकार्ट सपोर्टमध्ये आपले स्वागत आहे.",
-    supportIntro: "आम्ही आपल्या ऑर्डर, परतावा, डिलिव्हरी अपडेट्स आणि कोणत्याही प्रश्नासाठी मदतीसाठी येथे आहोत.",
-    supportLiveBadge: "सक्रिय सपोर्ट · 24/7 एआय आणि एजंट सहाय्य",
-    orderOverviewTitle: "आपली अलीकडील ऑर्डर",
-    orderedOn: "ऑर्डर तारीख",
-    deliveredOn: "डिलिव्हरी तारीख",
-    orderStatusLabel: "स्थिती",
-    viewOrderAction: "ऑर्डर ट्रॅक करा",
-    hideOrderAction: "ट्रॅकिंग लपवा",
-    supportOptionsTitle: "आज आम्ही आपली कशी मदत करू शकतो?",
-    actionTrack: "ऑर्डर ट्रॅक करा",
-    actionTrackSub: "थेट कुरिअर ट्रॅकिंग",
-    actionReturn: "परतावा किंवा रिफंडची विनंती करा",
-    actionReturnSub: "7-दिवसीय परतावा धोरण",
-    actionDamage: "खराब किंवा चुकीच्या उत्पादनाची तक्रार करा",
-    actionDamageSub: "पुरावा फोटो जोडा",
-    actionQuestion: "प्रश्न विचारा",
-    actionQuestionSub: "एआय त्वरित उत्तरे",
-    actionHuman: "मानवी एजंटशी कनेक्ट व्हा",
-    actionHumanSub: "सारा लिनशी संपर्क साधा",
-    chatEntryTitle: "आम्ही कशी मदत करू शकतो?",
-    chatEntrySub: "आपल्या ऑर्डरबद्दल काहीही विचारा",
-    suggestedQuestionsTitle: "आपल्या ऑर्डरसाठी सुचवलेले प्रश्न:",
-    welcomeBack: "पुन्हा स्वागत आहे",
-    viewWelcomeOverview: "ऑर्डर तपशील पहा",
-    backToConversation: "संभाषणाकडे परत जा",
-    demoSelectorLabel: "डेमो:",
-
-    // Storefront UI Translations (Marathi)
-    storefront: {
-      nav: {
-        officialStore: "अधिकृत स्टोअर",
-        searchPlaceholder: "स्पोर्ट्स शूज, स्मार्ट वेअरेबल्स, ऑडिओ शोधा...",
-        switchCustomer: "डेमो ग्राहक बदला",
-        storefront: "स्टोअरफ्रंट",
-        customer: "ग्राहक",
-        agent: "एजंट",
-        splitView: "स्प्लिट व्ह्यू",
-        cart: "कार्ट",
-        shoppingBag: "शॉपिंग बॅग",
-        policies: "धोरणे",
-        selectLanguage: "भाषा",
-      },
-      announcement: {
-        freeShipping: "⚡ $75 पेक्षा जास्त रकमेवर मोफत एक्सप्रेस डिलिव्हरी • 7 दिवसांत सुलभ परतावा",
-        aiResolution: "24/7 एआय-सहाय्यित त्वरित निवारण",
-        embedSnippet: "विजेट कोड स्निपेट",
-      },
-      hero: {
-        collectionBadge: "स्प्रिंग परफॉर्मन्स 2026 संग्रह",
-        titleLine1: "सक्रिय हालचालींसाठी निर्मित.",
-        titleLine2: "थेट एआय सपोर्टने सुरक्षित.",
-        subtitle: "प्रतिसाद देणारे रनिंग फूटवेअर, टायटॅनियम स्मार्ट घड्याळे आणि हायब्रिड एएनसी ऑडिओचा अनुभव घ्या. शून्य-प्रतीक्षा पार्सल ट्रॅकिंग आणि जलद निवारणासाठी थेट रिझॉल्व्ह एआय शी जोडलेले.",
-        shopFootwear: "फूटवेअर खरेदी करा",
-        trackShipment: "ऑर्डर ट्रॅक करा",
-        dispatchDelivery: "4–6 दिवसांत डिलिव्हरी",
-        returnWindow: "7-दिवसीय परतावा मुदत",
-        verifiedResolution: "पडताळणीकृत एआय निवारण",
-        featuredBadge: "विशेष",
-        delayedTransit: "पार्सलला विलंब झाला?",
-        askSupportAi: "एआय ला विचारा",
-      },
-      tracker: {
-        badge: "थेट कुरिअर ट्रॅकिंग व निवारण",
-        title: "आपली नोव्हाकार्ट शिपमेंट ट्रॅक करा",
-        demoOrders: "डेमो ऑर्डर्स:",
-        carrier: "कुरिअर",
-        trackingCode: "ट्रॅकिंग कोड:",
-        status: "स्थिती:",
-        launchSupport: "सपोर्ट चॅट सुरू करा",
-        preloadsContext: "ऑर्डर संदर्भ थेट रिझॉल्व्ह एआय मध्ये लोड करतो",
-      },
-      catalog: {
-        title: "नोव्हाकार्ट उत्पादन कॅटलॉग",
-        subtitle: "तपशील पाहण्यासाठी किंवा संभाषणात्मक सपोर्टकडे विचारणा करण्यासाठी कोणतेही उत्पादन निवडा",
-        categories: {
-          All: "सर्व",
-          Footwear: "फूटवेअर",
-          Wearables: "वेअरेबल्स",
-          Audio: "ऑडिओ",
-          Accessories: "अॅक्सेसरीज",
-        },
-        reviews: "पुनरावलोकने",
-        option: "पर्याय:",
-        inStock: "स्टॉकमध्ये उपलब्ध",
-        addToCart: "कार्टमध्ये जोडा",
-        added: "जोडले गेले ✓",
-        inquireAi: "एआय कडे चौकशी करा",
-        badges: {
-          bestSeller: "बेस्ट सेलर",
-          staffFavorite: "आवडते",
-          noiseCancelling: "नॉइज कॅन्सलिंग",
-          inStock: "उपलब्ध",
-          threePack: "3-पॅक",
-          fastCharging: "फास्ट 15W",
-        }
-      },
-      guarantees: {
-        badge: "नोव्हाकार्ट विश्वास आणि सपोर्ट हमी",
-        title: "स्वयंचलित धोरण अंमलबजावणी",
-        subtitle: "सातत्यपूर्ण आणि पारदर्शक निवारणासाठी प्रत्येक धोरण नियमाचे थेट रिझॉल्व्ह एआय द्वारे मूल्यमापन केले जाते.",
-        dispatchTitle: "4–6 दिवसांत रवानगी",
-        dispatchDesc: "पडताळणी केलेल्या FedEx, UPS किंवा DHL ट्रॅकिंग अपडेट्ससह 4-6 कामकाजाच्या दिवसांत मानक डिलिव्हरी.",
-        returnTitle: "7-दिवसीय परतावा मुदत",
-        returnDesc: "त्वरित परतावा पुनरावलोकनासाठी पुष्टी केलेल्या डिलिव्हरीच्या 7 कॅलेंडर दिवसांच्या आत सुलभ परतावा सुरू करा.",
-        damagedTitle: "खराब उत्पादन पुनर्बदली",
-        damagedDesc: "फोटो पुराव्याच्या पडताळणीनंतर खराब किंवा चुकीच्या शिपमेंटसाठी त्वरित मोफत पुनर्बदली.",
-        humanTitle: "मानवी एजंट हस्तांतरण",
-        humanDesc: "पूर्ण संदर्भ आणि संभाषण इतिहासासह वरिष्ठ सपोर्ट विशेषज्ञ सारा लिन यांच्याकडे वन-क्लिक हस्तांतरण.",
-      },
-      embedBanner: {
-        title: "आपल्या स्वतःच्या स्टोअरफ्रंटवर रिझॉल्व्ह एआय समाविष्ट करा",
-        subtitle: "PostgreSQL, Gemini AI आणि Nexconn रिअल-टाइम मेसेजिंगद्वारे समर्थित एम्बेड करण्यायोग्य सपोर्ट विजेट.",
-        viewSnippet: "स्क्रिप्ट स्निपेट आणि थीमिंग पहा",
-      },
-      footer: {
-        copyright: "© 2026 नोव्हाकार्ट इंक. सर्व हक्क राखीव. रिझॉल्व्ह एआय सपोर्ट सूट द्वारे समर्थित.",
-        privacy: "गोपनीयता",
-        terms: "सेवा अटी",
-        security: "सुरक्षा",
-      },
-      cart: {
-        headingCart: "आपली शॉपिंग बॅग",
-        headingCheckout: "डेमो चेकआउट",
-        headingConfirmed: "ऑर्डर पुष्टी झाली",
-        itemsInBag: "बॅगेत वस्तू",
-        itemInBag: "बॅगेत वस्तू",
-        officialStore: "नोव्हाकार्ट अधिकृत स्टोअर",
-        freeShippingUnlocked: "मोफत एक्सप्रेस डिलिव्हरी अनलॉक झाली!",
-        addMoreForFreeShipping: "आणखी जोडा मोफत डिलिव्हरीसाठी",
-        addPrefix: "फक्त",
-        emptyTitle: "आपली बॅग रिकामी आहे",
-        emptyDesc: "आमचे परफॉर्मन्स कपडे, वायरलेस चार्जिंग गियर आणि नॉइज-कॅन्सलिंग ऑडिओ एक्सप्लोर करा.",
-        continueShopping: "खरेदी सुरू ठेवा",
-        itemsSubtotal: "वस्तूंची उपबेरीज",
-        shippingExpress: "डिलिव्हरी (एक्सप्रेस 2-3 दिवस)",
-        free: "मोफत",
-        estimatedTax: "अंदाजे विक्री कर (8%)",
-        total: "एकूण",
-        grandTotal: "अंतिम एकूण रक्कम",
-        proceedCheckout: "डेमो चेकआउटकडे पुढे जा",
-        clearBag: "बॅग रिकामी करा",
-        simulatedNoticeTitle: "सिम्युलेटेड चेकआउट",
-        simulatedNoticeDesc: "हे एक प्रात्यक्षिक स्टोअर आहे. कोणतेही खरे पेमेंट किंवा क्रेडिट कार्ड प्रक्रिया केले जात नाही.",
-        shippingInfoTitle: "डिलिव्हरी माहिती",
-        autoFillDemo: "डेमो माहिती स्वयंचलित भरा",
-        fullName: "पूर्ण नाव",
-        emailAddress: "ईमेल पत्ता",
-        shippingAddress: "डिलिव्हरीचा पत्ता",
-        city: "शहर",
-        postalCode: "पिन कोड",
-        deliveryMethod: "डिलिव्हरी पद्धत",
-        fedexPriority: "FedEx प्राधान्य एक्सप्रेस",
-        estimatedDays: "अपेक्षित 2–3 कामकाजाचे दिवस",
-        orderSummary: "ऑर्डर सारांश",
-        completeOrder: "डेमो ऑर्डर पूर्ण करा",
-        returnToBag: "← शॉपिंग बॅगकडे परत जा",
-        confirmedTitle: "ऑर्डर पुष्टी झाली!",
-        confirmedThankYou: "आपली प्रात्यक्षिक ऑर्डर यशस्वीरित्या तयार केली गेली आहे.",
-        orderNumberLabel: "ऑर्डर क्रमांक",
-        carrierLabel: "कुरिअर",
-        deliveryTargetLabel: "डिलिव्हरी लक्ष्य:",
-        trackingCodeLabel: "ट्रॅकिंग कोड:",
-        itemsCountLabel: "वस्तूंची संख्या:",
-        amountPaidLabel: "भरलेली रक्कम:",
-        resolveAiTitle: "रिझॉल्व्ह एआय सपोर्ट इंटिग्रेशन",
-        resolveAiDesc: "डिलिव्हरीच्या वेळेबद्दल किंवा ऑर्डरच्या तपशीलांबद्दल काही प्रश्न आहेत? आमच्या एआय सह-वैमानिकाशी त्वरित चॅट करा किंवा मानवी तज्ञांशी संपर्क साधा.",
-        trackWithAssistant: "रिझॉल्व्ह एआय सहाय्यकासह ट्रॅक करा",
-      }
-    },
-  }
+  en,
+  hi,
+  mr,
+  es,
+  de,
+  fr,
+  ja,
+  pt,
+  ar,
+  'zh-CN': zhCN,
+  bn,
+  ta
 };
 
 export const SUPPORTED_LANGUAGES = [
-  { code: 'en', label: 'English', native: 'English' },
-  { code: 'hi', label: 'Hindi', native: 'हिन्दी' },
-  { code: 'mr', label: 'Marathi', native: 'मराठी' },
+  { code: 'en', label: 'English', native: 'English', bcp47: 'en-US', dir: 'ltr' },
+  { code: 'hi', label: 'Hindi', native: 'हिन्दी', bcp47: 'hi-IN', dir: 'ltr' },
+  { code: 'mr', label: 'Marathi', native: 'मराठी', bcp47: 'mr-IN', dir: 'ltr' },
+  { code: 'es', label: 'Spanish', native: 'Español', bcp47: 'es-ES', dir: 'ltr' },
+  { code: 'de', label: 'German', native: 'Deutsch', bcp47: 'de-DE', dir: 'ltr' },
+  { code: 'fr', label: 'French', native: 'Français', bcp47: 'fr-FR', dir: 'ltr' },
+  { code: 'ja', label: 'Japanese', native: '日本語', bcp47: 'ja-JP', dir: 'ltr' },
+  { code: 'pt', label: 'Portuguese', native: 'Português', bcp47: 'pt-BR', dir: 'ltr' },
+  { code: 'ar', label: 'Arabic', native: 'العربية', bcp47: 'ar-SA', dir: 'rtl' },
+  { code: 'zh-CN', label: 'Chinese (Simplified)', native: '简体中文', bcp47: 'zh-CN', dir: 'ltr' },
+  { code: 'bn', label: 'Bengali', native: 'বাংলা', bcp47: 'bn-IN', dir: 'ltr' },
+  { code: 'ta', label: 'Tamil', native: 'தமிழ்', bcp47: 'ta-IN', dir: 'ltr' },
 ];
+
+export const SUPPORTED_LANGUAGE_CODES = SUPPORTED_LANGUAGES.map(l => l.code);
 
 export const getPersonalizedGreeting = (customerId, lang = 'en') => {
   const t = TRANSLATIONS[lang] || TRANSLATIONS.en;
-  if (customerId === 'cust_aarav') return t.welcomeAarav;
-  if (customerId === 'cust_priya') return t.welcomePriya;
-  if (customerId === 'cust_kabir') return t.welcomeKabir;
+  if (customerId === 'cust_aarav' || customerId === 'Aarav Sharma') return t.welcomeAarav;
+  if (customerId === 'cust_priya' || customerId === 'Priya Mehta') return t.welcomePriya;
+  if (customerId === 'cust_kabir' || customerId === 'Kabir Verma') return t.welcomeKabir;
   return t.welcomeDefault;
 };
 
@@ -695,19 +58,52 @@ export const getAssistantIntroMessage = (customerId, lang = 'en') => {
       en: "Hello Aarav! I see your order #NC1021 for the NovaSprint Pro Running Shoes is currently delayed at the regional logistics hub. How can we assist you today?",
       hi: "नमस्ते आरव! हम देख सकते हैं कि आपके ऑर्डर #NC1021 (नोवास्प्रिंट प्रो रनिंग शूज) में कूरियर हब पर देरी हो रही है। आज हम आपकी क्या सहायता कर सकते हैं?",
       mr: "नमस्कार आरव! आम्ही पाहू शकतो की आपल्या #NC1021 ऑर्डरमध्ये (नोव्हास्प्रिंट प्रो रनिंग शूज) कूरियर हबवर विलंब झाला आहे. आज आम्ही आपली कशी मदत करू शकतो?",
+      es: "¡Hola Aarav! Veo que tu pedido #NC1021 de las zapatillas NovaSprint Pro Running Shoes tiene un retraso en el centro logístico regional. ¿Cómo podemos ayudarte hoy?",
+      de: "Hallo Aarav! Ihre Bestellung #NC1021 für die NovaSprint Pro Running Shoes hat derzeit eine Verzögerung im regionalen Logistikzentrum. Wie können wir Ihnen heute helfen?",
+      fr: "Bonjour Aarav ! Je constate que votre commande #NC1021 pour les chaussures NovaSprint Pro Running Shoes est actuellement retardée au centre logistique régional. Comment pouvons-nous vous aider aujourd'hui ?",
+      ja: "Aarav様、こんにちは。ご注文の #NC1021（NovaSprint Pro Running Shoes）は現在、地域物流拠点にて遅延が発生しております。本日はどのようなサポートが必要でしょうか？",
+      pt: "Olá Aarav! Vejo que seu pedido #NC1021 dos tênis NovaSprint Pro Running Shoes está atrasado no centro logístico regional. Como podemos te ajudar hoje?",
+      ar: "مرحباً Aarav! أرى أن طلبك رقم #NC1021 الخاص بحذاء NovaSprint Pro Running Shoes متأخر حالياً في المركز اللوجستي الإقليمي. كيف يمكننا مساعدتك اليوم؟",
+      'zh-CN': "您好 Aarav！我们看到您的订单 #NC1021（NovaSprint Pro Running Shoes）目前在区域物流枢纽发生延误。今天有什么可以帮您的？",
+      bn: "নমস্কার Aarav! আমরা দেখতে পাচ্ছি আপনার অর্ডার #NC1021 (NovaSprint Pro Running Shoes) আঞ্চলিক লজিস্টিক হাবে বিলম্বিত হচ্ছে। আজ আমরা আপনাকে কীভাবে সাহায্য করতে পারি?",
+      ta: "வணக்கம் Aarav! NovaSprint Pro Running Shoes-க்கான உங்கள் ஆர்டர் #NC1021 தற்போது பிராந்திய தளவாட மையத்தில் தாமதமாகியுள்ளது. இன்று நாங்கள் உங்களுக்கு எவ்வாறு உதவ முடியும்?"
     },
     cust_priya: {
       en: "Hello Priya! Your order #NC1022 for the NovaPulse Smartwatch was delivered recently. How can we help you today?",
       hi: "नमस्ते प्रिया! आपका ऑर्डर #NC1022 (नोवापल्स स्मार्टवॉच) हाल ही में डिलीवर किया गया है। आज हम आपकी क्या सहायता कर सकते हैं?",
       mr: "नमस्कार प्रिया! आपली ऑर्डर #NC1022 (नोव्हापल्स स्मार्टवॉच) नुकतीच डिलिव्हर झाली आहे. आज आम्ही आपली काय मदत करू शकतो?",
+      es: "¡Hola Priya! Tu pedido #NC1022 del smartwatch NovaPulse Smartwatch fue entregado recientemente. ¿En qué podemos ayudarte hoy?",
+      de: "Hallo Priya! Ihre Bestellung #NC1022 für die NovaPulse Smartwatch wurde kürzlich zugestellt. Wie können wir Ihnen heute helfen?",
+      fr: "Bonjour Priya ! Votre commande #NC1022 pour la montre connectée NovaPulse Smartwatch a été livrée récemment. Comment pouvons-nous vous aider aujourd'hui ?",
+      ja: "Priya様、こんにちは。ご注文の #NC1022（NovaPulse Smartwatch）は最近お届け完了となっております。本日はどのようなご用件でしょうか？",
+      pt: "Olá Priya! Seu pedido #NC1022 do smartwatch NovaPulse Smartwatch foi entregue recentemente. Como podemos te ajudar hoje?",
+      ar: "مرحباً Priya! تم تسليم طلبك رقم #NC1022 الخاص بساعة NovaPulse Smartwatch مؤخراً. كيف يمكننا مساعدتك اليوم؟",
+      'zh-CN': "您好 Priya！您的订单 #NC1022（NovaPulse Smartwatch）近期已送达。今天有什么可以帮您的？",
+      bn: "নমস্কার Priya! আপনার অর্ডার #NC1022 (NovaPulse Smartwatch) সম্প্রতি ডেলিভার করা হয়েছে। আজ কীভাবে সাহায্য করতে পারি?",
+      ta: "வணக்கம் Priya! NovaPulse Smartwatch-க்கான உங்கள் ஆர்டர் #NC1022 சமீபத்தில் டெலிவரி செய்யப்பட்டது. இன்று நாங்கள் எவ்வாறு உதவலாம்?"
     },
     cust_kabir: {
       en: "Hello Kabir! Your order #NC1023 for the NovaBass Wireless ANC Headphones was delivered. How can we help with your package?",
       hi: "नमस्ते कबीर! आपका ऑर्डर #NC1023 (नोवाबॉस वायरलेस एएनसी हेडफ़ोन) डिलीवर हो गया है। कृपया बताएं कि हम आपके पैकेज में क्या मदद कर सकते हैं।",
       mr: "नमस्कार कबीर! आपली ऑर्डर #NC1023 (नोव्हाबास वायरलेस एएनसी हेडफोन्स) डिलिव्हर झाली आहे. कृपया सांगा आम्ही आपल्या पॅकेजमध्ये कशी मदत करू शकतो.",
-    },
+      es: "¡Hola Kabir! Tu pedido #NC1023 de los auriculares NovaBass Wireless ANC Headphones fue entregado. ¿Cómo podemos ayudarte con tu paquete?",
+      de: "Hallo Kabir! Ihre Bestellung #NC1023 für die NovaBass Wireless ANC Headphones wurde zugestellt. Wie können wir Ihnen bei Ihrem Paket helfen?",
+      fr: "Bonjour Kabir ! Votre commande #NC1023 pour le casque NovaBass Wireless ANC Headphones a été livrée. Comment pouvons-nous vous aider avec votre colis ?",
+      ja: "Kabir様、こんにちは。ご注文の #NC1023（NovaBass Wireless ANC Headphones）はお届け完了いたしました。お荷物に関して何かお手伝いできることはありますか？",
+      pt: "Olá Kabir! Seu pedido #NC1023 dos fones NovaBass Wireless ANC Headphones foi entregue. Como podemos ajudar com seu pacote?",
+      ar: "مرحباً Kabir! تم تسليم طلبك رقم #NC1023 الخاص بسماعات NovaBass Wireless ANC Headphones. كيف يمكننا مساعدتك في شحنتك؟",
+      'zh-CN': "您好 Kabir！您的订单 #NC1023（NovaBass Wireless ANC Headphones）已送达。请问关于您的包裹有什么我们可以协助的？",
+      bn: "নমস্কার Kabir! আপনার অর্ডার #NC1023 (NovaBass Wireless ANC Headphones) ডেলিভার হয়েছে। আপনার প্যাকেজ সম্পর্কিত কী সাহায্য করতে পারি?",
+      ta: "வணக்கம் Kabir! NovaBass Wireless ANC Headphones-க்கான உங்கள் ஆர்டர் #NC1023 டெலிவரி செய்யப்பட்டது. உங்கள் பார்சல் பற்றி நாங்கள் எவ்வாறு உதவலாம்?"
+    }
   };
-  return intros[customerId]?.[lang] || intros[customerId]?.en || "Hello! How can we assist you with your order today?";
+
+  const cId = (customerId === 'Aarav Sharma' || customerId === 'cust_aarav') ? 'cust_aarav'
+    : (customerId === 'Priya Mehta' || customerId === 'cust_priya') ? 'cust_priya'
+    : (customerId === 'Kabir Verma' || customerId === 'cust_kabir') ? 'cust_kabir'
+    : customerId;
+
+  return intros[cId]?.[lang] || intros[cId]?.en || "Hello! How can we assist you with your order today?";
 };
 
 export const getSuggestedQuestions = (customerId, lang = 'en') => {
@@ -728,6 +124,51 @@ export const getSuggestedQuestions = (customerId, lang = 'en') => {
         "माझी डिलिव्हरी 5 नोव्हेंबर नंतर का उशिरा झाली आहे?",
         "मला प्राधान्याने डिलिव्हरी मिळू शकते का?"
       ],
+      es: [
+        "¿Dónde está mi paquete en este momento?",
+        "¿Por qué se retrasó la entrega después del 5 de nov?",
+        "¿Se puede acelerar el tránsito prioritario?"
+      ],
+      de: [
+        "Wo befindet sich mein Paket aktuell?",
+        "Warum verzögert sich die Lieferung über den 5. Nov hinaus?",
+        "Kann der Versand priorisiert werden?"
+      ],
+      fr: [
+        "Où se trouve mon colis actuellement ?",
+        "Pourquoi la livraison est-elle retardée après le 5 nov. ?",
+        "Pouvez-vous accélérer l'expédition prioritaire ?"
+      ],
+      ja: [
+        "荷物は現在どこにありますか？",
+        "11月5日を過ぎても配送が遅れている理由は何ですか？",
+        "優先発送で配送を早めることはできますか？"
+      ],
+      pt: [
+        "Onde está meu pacote agora?",
+        "Por que a entrega está atrasada após 5 de nov?",
+        "Vocês podem agilizar o trânsito prioritário?"
+      ],
+      ar: [
+        "أين طردي في الوقت الحالي؟",
+        "لماذا تأخر التوصيل بعد موعد 5 نوفمبر؟",
+        "هل يمكن تسريع الشحن ذو الأولوية؟"
+      ],
+      'zh-CN': [
+        "我的包裹现在在什么位置？",
+        "为什么11月5日后配送出现延迟？",
+        "能否加急安排优先派送？"
+      ],
+      bn: [
+        "আমার প্যাকেজটি এখন কোথায় আছে?",
+        "৫ নভেম্বরের পরেও ডেলিভারি কেন দেরি হচ্ছে?",
+        "এটি কি দ্রুত অগ্রাধিকার ভিত্তিতে পাঠানো সম্ভব?"
+      ],
+      ta: [
+        "எனது பார்சல் தற்போது எங்குள்ளது?",
+        "நவம்பர் 5க்கு பிறகும் டெலிவரி ஏன் தாமதமாகிறது?",
+        "முன்னுரிமை அடிப்படையில் விரைவுபடுத்த முடியுமா?"
+      ]
     },
     cust_priya: {
       en: [
@@ -738,35 +179,136 @@ export const getSuggestedQuestions = (customerId, lang = 'en') => {
       hi: [
         "मैं यह स्मार्टवॉच कैसे वापस करूँ?",
         "क्या मैं 7-दिन की वापसी अवधि के भीतर हूँ?",
-        "क्या आप प्री-पेड रिटर्न लेबल बना सकते हैं?"
+        "क्या आप प्रीपेड रिटर्न लेबल बना सकते हैं?"
       ],
       mr: [
-        "मी ही स्मार्टवॉच कशी परत करू?",
-        "मी 7 दिवसांच्या परतावा मुदतीत आहे का?",
+        "मी हे स्मार्टवॉच कसे परत करू?",
+        "मी 7-दिवसांच्या रिटर्न कालावधीत आहे का?",
         "तुम्ही प्रीपेड रिटर्न लेबल तयार करू शकता का?"
       ],
+      es: [
+        "¿Cómo devuelvo este smartwatch?",
+        "¿Estoy dentro del plazo de 7 días para devoluciones?",
+        "¿Pueden generar una etiqueta prepagada de devolución?"
+      ],
+      de: [
+        "Wie kann ich diese Smartwatch zurücksenden?",
+        "Liege ich innerhalb der 7-tägigen Rückgabefrist?",
+        "Können Sie ein vorfrankiertes Rücksendeetikett erstellen?"
+      ],
+      fr: [
+        "Comment retourner cette montre connectée ?",
+        "Suis-je dans le délai de retour de 7 jours ?",
+        "Pouvez-vous générer une étiquette de retour prépayée ?"
+      ],
+      ja: [
+        "このスマートウォッチを返品するにはどうすればよいですか？",
+        "7日間の返品期間内ですか？",
+        "着払い返品ラベルを発行できますか？"
+      ],
+      pt: [
+        "Como devolver este smartwatch?",
+        "Ainda estou no prazo de devolução de 7 dias?",
+        "Podem gerar uma etiqueta pré-paga de devolução?"
+      ],
+      ar: [
+        "كيف يمكنني إرجاع هذه الساعة الذكية؟",
+        "هل أنا ضمن مهلة الإرجاع المحددة بـ 7 أيام؟",
+        "هل يمكنك إنشاء ملصق إرجاع مدفوع مسبقاً؟"
+      ],
+      'zh-CN': [
+        "我该如何办理这款智能手表的退货？",
+        "我还在7天无理由退货期内吗？",
+        "能否生成预付费退货面单？"
+      ],
+      bn: [
+        "আমি কীভাবে এই স্মার্টওয়াচটি ফেরত দেব?",
+        "আমি কি ৭ দিনের রিটার্ন উইন্ডোর মধ্যে আছি?",
+        "আপনারা কি একটি প্রি-পেইড রিটার্ন লেবেল তৈরি করতে পারবেন?"
+      ],
+      ta: [
+        "இந்த ஸ்மார்ட்வாட்சை எவ்வாறு திருப்பி அனுப்புவது?",
+        "நான் 7 நாள் ரிட்டர்ன் வாய்ப்பிற்குள் உள்ளேனா?",
+        "ப்ரீபெய்ட் ரிட்டர்ன் லேபிளை உருவாக்க முடியுமா?"
+      ]
     },
     cust_kabir: {
       en: [
-        "I received the wrong item in my box",
-        "How do I request an immediate replacement?",
-        "I want to talk to a human support agent"
+        "I need help setting up ANC mode",
+        "How long does the battery last with ANC on?",
+        "Can I connect to two devices simultaneously?"
       ],
       hi: [
-        "मुझे बॉक्स में गलत उत्पाद मिला है",
-        "मुझे तुरंत रिप्लेसमेंट कैसे मिलेगा?",
-        "मैं मानव सहायता एजेंट से बात करना चाहता हूँ"
+        "मुझे एएनसी मोड सेट करने में मदद चाहिए",
+        "एएनसी चालू रहने पर बैटरी कितने समय तक चलती है?",
+        "क्या मैं इसे एक साथ दो डिवाइस से जोड़ सकता हूँ?"
       ],
       mr: [
-        "मला बॉक्समध्ये चुकीचे उत्पादन मिळाले आहे",
-        "मला तात्काळ रिप्लेसमेंट कशी मिळेल?",
-        "मला मानवी सपोर्ट एजंटशी बोलायचे आहे"
+        "मला एएनसी मोड सेट करण्यासाठी मदत हवी आहे",
+        "एएनसी चालू असताना बॅटरी किती वेळ चालते?",
+        "मी एकाच वेळी दोन उपकरणांशी कनेक्ट करू शकतो का?"
       ],
-    },
+      es: [
+        "Necesito ayuda para configurar el modo ANC",
+        "¿Cuánto dura la batería con la cancelación de ruido activada?",
+        "¿Puedo conectarlo a dos dispositivos simultáneamente?"
+      ],
+      de: [
+        "Ich brauche Hilfe bei der Einrichtung des ANC-Modus",
+        "Wie lange hält der Akku bei aktiviertem ANC?",
+        "Kann ich mich mit zwei Geräten gleichzeitig verbinden?"
+      ],
+      fr: [
+        "J'ai besoin d'aide pour configurer le mode ANC",
+        "Quelle est l'autonomie de la batterie avec l'ANC activé ?",
+        "Puis-je me connecter à deux appareils simultanément ?"
+      ],
+      ja: [
+        "ANCモードの設定を手伝ってください",
+        "ANCを有効にした場合のバッテリー駆動時間はどのくらいですか？",
+        "同時に2台のデバイスに接続できますか？"
+      ],
+      pt: [
+        "Preciso de ajuda para configurar o modo ANC",
+        "Quanto tempo dura a bateria com o ANC ativado?",
+        "Posso conectar em dois dispositivos simultaneamente?"
+      ],
+      ar: [
+        "أحتاج مساعدة في ضبط وضع عزل الضوضاء ANC",
+        "كم تدوم البطارية مع تشغيل وضع عزل الضوضاء؟",
+        "هل يمكنني الاتصال بجهازين في نفس الوقت؟"
+      ],
+      'zh-CN': [
+        "我需要协助设置主动降噪(ANC)模式",
+        "开启ANC降噪后电池能使用多久？",
+        "能否同时连接两台蓝牙设备？"
+      ],
+      bn: [
+        "আমার এএনসি মোড সেট আপ করতে সাহায্য প্রয়োজন",
+        "এএনসি চালু থাকলে ব্যাটারি কতক্ষণ চলে?",
+        "আমি কি একসাথে দুটি ডিভাইসের সাথে কানেক্ট করতে পারব?"
+      ],
+      ta: [
+        "ANC பயன்முறையை அமைக்க உதவி தேவை",
+        "ANC இயக்கப்பட்டிருக்கும் போது பேட்டரி எவ்வளவு நேரம் நீடிக்கும்?",
+        "ஒரே நேரத்தில் இரண்டு சாதனங்களுடன் இணைக்க முடியுமா?"
+      ]
+    }
   };
-  return questions[customerId]?.[lang] || questions[customerId]?.en || [
-    "Track my order",
-    "Return or refund policy",
-    "Speak with human agent"
-  ];
+
+  const cId = (customerId === 'Aarav Sharma' || customerId === 'cust_aarav') ? 'cust_aarav'
+    : (customerId === 'Priya Mehta' || customerId === 'cust_priya') ? 'cust_priya'
+    : (customerId === 'Kabir Verma' || customerId === 'cust_kabir') ? 'cust_kabir'
+    : customerId;
+
+  return questions[cId]?.[lang] || questions[cId]?.en || [];
+};
+
+export default {
+  TRANSLATIONS,
+  SUPPORTED_LANGUAGES,
+  SUPPORTED_LANGUAGE_CODES,
+  getPersonalizedGreeting,
+  getAssistantIntroMessage,
+  getSuggestedQuestions
 };

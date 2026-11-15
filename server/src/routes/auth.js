@@ -84,6 +84,7 @@ router.post('/agent/login', async (req, res) => {
     return res.json({
       success: true,
       csrfToken,
+      sessionToken,
       agent: {
         id: user.id,
         name: user.name,

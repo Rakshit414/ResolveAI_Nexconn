@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { DEMO_CUSTOMERS, DEMO_AGENT } from '../data/demoData';
+import { DEMO_CUSTOMERS, DEMO_AGENT, DEMO_AGENTS_LIST } from '../data/demoData';
 import {
   getTickets,
   getTicket,
@@ -30,7 +30,8 @@ import {
   AlertCircle,
   RefreshCw,
   Check,
-  UserCheck
+  UserCheck,
+  Users
 } from 'lucide-react';
 
 export default function AgentDashboard({
@@ -45,6 +46,9 @@ export default function AgentDashboard({
   const [agentRoster, setAgentRoster] = useState([]);
   const [currentInboxView, setCurrentInboxView] = useState('my_tickets'); // 'my_tickets' | 'unassigned' | 'team_overview'
 
+  const [currentAgent, setCurrentAgent] = useState(DEMO_AGENTS_LIST[0]);
+  const [agentDropdownOpen, setAgentDropdownOpen] = useState(false);
+
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [messagesMap, setMessagesMap] = useState({});
   const [activeFilter, setActiveFilter] = useState('All');
@@ -55,7 +59,7 @@ export default function AgentDashboard({
   const [effectiveStatus, setEffectiveStatus] = useState('Available');
   const [activeWorkload, setActiveWorkload] = useState(0);
   const [maxCapacity, setMaxCapacity] = useState(3);
-  const [agentRole, setAgentRole] = useState('agent'); // 'agent' | 'support_lead' | 'admin'
+  const [agentRole, setAgentRole] = useState(DEMO_AGENTS_LIST[0].role); // 'agent' | 'support_lead' | 'admin'
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
   const [isKnowledgeHubOpen, setIsKnowledgeHubOpen] = useState(false);
 
@@ -87,18 +91,50 @@ export default function AgentDashboard({
     return 'Available';
   };
 
+  // Dynamic agent identity switch handler
+  const handleSwitchAgent = async (agent) => {
+    setCurrentAgent(agent);
+    setAgentRole(agent.role);
+    setAgentDropdownOpen(false);
+    try {
+      const sessionRes = await createAgentSession(agent.id, 'brand_novacart');
+      if (sessionRes?.profile) {
+        const prof = sessionRes.profile;
+        setConfiguredStatus(prof.configuredStatus || 'Available');
+        setMaxCapacity(prof.maxConcurrentTickets || 3);
+        setActiveWorkload(prof.activeTicketCount || 0);
+        setAgentRole(prof.role || agent.role);
+        setEffectiveStatus(calculateEffectiveStatus(
+          prof.configuredStatus || 'Available',
+          prof.activeTicketCount || 0,
+          prof.maxConcurrentTickets || 3
+        ));
+      }
+      nexconnService.connectUser({
+        id: agent.id,
+        name: agent.name,
+        avatar: agent.avatar,
+        role: 'agent',
+      });
+      refreshData();
+    } catch (e) {
+      console.warn('[handleSwitchAgent notice]:', e.message);
+    }
+  };
+
   // 1. Establish Agent Session & Periodic Heartbeat on Mount
   useEffect(() => {
     let isMounted = true;
 
     async function initAgentSession() {
       try {
-        const sessionRes = await createAgentSession('user_sarah_lin', 'brand_novacart');
+        const sessionRes = await createAgentSession(currentAgent.id, 'brand_novacart');
         if (isMounted && sessionRes?.profile) {
           const prof = sessionRes.profile;
           setConfiguredStatus(prof.configuredStatus || 'Available');
           setMaxCapacity(prof.maxConcurrentTickets || 3);
           setActiveWorkload(prof.activeTicketCount || 0);
+          setAgentRole(prof.role || currentAgent.role);
           setEffectiveStatus(calculateEffectiveStatus(
             prof.configuredStatus || 'Available',
             prof.activeTicketCount || 0,
@@ -121,7 +157,7 @@ export default function AgentDashboard({
       isMounted = false;
       if (heartbeatTimerRef.current) clearInterval(heartbeatTimerRef.current);
     };
-  }, []);
+  }, [currentAgent.id]);
 
   // 2. Fetch Remote Tickets, Roster & Unassigned Queue
   const refreshData = useCallback(async () => {
@@ -134,12 +170,13 @@ export default function AgentDashboard({
 
       if (rosterRes.status === 'fulfilled' && rosterRes.value?.roster) {
         setAgentRoster(rosterRes.value.roster);
-        const sarah = rosterRes.value.roster.find(a => a.userId === 'user_sarah_lin');
-        if (sarah) {
-          setConfiguredStatus(sarah.configuredStatus);
-          setActiveWorkload(sarah.activeTicketCount);
-          setMaxCapacity(sarah.maxConcurrentTickets);
-          setEffectiveStatus(sarah.effectiveStatus || calculateEffectiveStatus(sarah.configuredStatus, sarah.activeTicketCount, sarah.maxConcurrentTickets));
+        const me = rosterRes.value.roster.find(a => a.userId === currentAgent.id);
+        if (me) {
+          setConfiguredStatus(me.configuredStatus);
+          setActiveWorkload(me.activeTicketCount);
+          setMaxCapacity(me.maxConcurrentTickets);
+          setAgentRole(me.role || currentAgent.role);
+          setEffectiveStatus(me.effectiveStatus || calculateEffectiveStatus(me.configuredStatus, me.activeTicketCount, me.maxConcurrentTickets));
         }
       }
 
@@ -153,14 +190,14 @@ export default function AgentDashboard({
     } catch (e) {
       // Non-fatal fallback
     }
-  }, []);
+  }, [currentAgent.id]);
 
   // 3. Initialize tickets and Nexconn listeners
   useEffect(() => {
     nexconnService.connectUser({
-      id: DEMO_AGENT.id,
-      name: DEMO_AGENT.name,
-      avatar: DEMO_AGENT.avatar,
+      id: currentAgent.id,
+      name: currentAgent.name,
+      avatar: currentAgent.avatar,
       role: 'agent',
     });
 
@@ -387,7 +424,7 @@ export default function AgentDashboard({
       const channelId = selectedTicket?.channelId || `channel_${selectedTicket?.orderId}`;
       const transferNote = {
         id: `note_transfer_${Date.now()}`,
-        senderName: 'Sarah Lin',
+        senderName: currentAgent.name,
         senderRole: 'internal_note',
         isInternal: true,
         text: `Transferred ticket to agent ${transferData.toAgentId}. Handoff context: ${transferData.handoffSummaryJson?.reason || 'Reassigned'}. Notes: ${transferData.internalNotes || 'None'}`,
@@ -568,39 +605,75 @@ export default function AgentDashboard({
     <div className="flex flex-col h-full bg-[#0A0A0A] overflow-hidden">
       {/* 1. Header: Sarah Lin Identity, Availability Status, Capacity Badge & Knowledge Hub */}
       <div className="bg-[#0D0D0D] border-b border-[#1A1A1A] px-5 py-3 flex items-center justify-between shrink-0 text-xs">
-        {/* Left: Agent Profile & Status Selector */}
+        {/* Left: Agent Identity Switcher & Status Selector */}
         <div className="flex items-center space-x-3.5">
-          <div className="flex items-center space-x-2.5">
-            <div className="relative">
-              <span className={`w-3 h-3 rounded-full block border-2 border-[#0D0D0D] ${
-                isAtCapacity
-                  ? 'bg-[#F59E0B] shadow-neon-sm'
-                  : configuredStatus === 'Available'
-                  ? 'bg-[#7CFF00] shadow-neon-sm'
-                  : configuredStatus === 'Busy'
-                  ? 'bg-[#EF4444]'
-                  : configuredStatus === 'Away'
-                  ? 'bg-[#F59E0B]'
-                  : 'bg-[#6B7280]'
-              }`} />
-            </div>
-
-            <div className="flex flex-col">
-              <div className="flex items-center space-x-2">
-                <span className="font-bold text-sm text-[#FFFFFF]">Sarah Lin</span>
-                <span className="text-[10px] text-[#7CFF00] font-mono px-1.5 py-0.2 rounded bg-[#7CFF00]/10 border border-[#7CFF00]/30 font-semibold">
-                  {agentRole === 'support_lead' ? 'Support Lead' : 'Support Specialist'}
-                </span>
-                {/* Role Switcher for verification */}
-                <button
-                  onClick={() => setAgentRole(prev => prev === 'agent' ? 'support_lead' : 'agent')}
-                  className="text-[10px] text-[#6B7280] hover:text-[#9CA3AF] underline font-mono hidden sm:inline"
-                  title="Toggle Role between Specialist and Support Lead (RBAC Demo)"
-                >
-                  [{agentRole === 'agent' ? 'Switch to Lead' : 'Switch to Agent'}]
-                </button>
+          <div className="relative">
+            <button
+              id="btn-agent-account-switcher"
+              onClick={() => setAgentDropdownOpen(!agentDropdownOpen)}
+              className="flex items-center space-x-2.5 bg-[#141414] hover:bg-[#1C1C1C] border border-[#242424] hover:border-[#7CFF00]/40 px-3 py-1.5 rounded-xl transition-all shadow-sm"
+              title="Switch demo agent identity"
+            >
+              <div className="relative">
+                <img
+                  src={currentAgent.avatar}
+                  alt={currentAgent.name}
+                  className="w-6 h-6 rounded-full object-cover ring-1 ring-[#333333]"
+                />
+                <span className={`w-2.5 h-2.5 rounded-full block border-2 border-[#0D0D0D] absolute -bottom-0.5 -right-0.5 ${
+                  isAtCapacity
+                    ? 'bg-[#F59E0B] shadow-neon-sm'
+                    : configuredStatus === 'Available'
+                    ? 'bg-[#7CFF00] shadow-neon-sm'
+                    : configuredStatus === 'Busy'
+                    ? 'bg-[#EF4444]'
+                    : configuredStatus === 'Away'
+                    ? 'bg-[#F59E0B]'
+                    : 'bg-[#6B7280]'
+                }`} />
               </div>
-            </div>
+              <div className="flex flex-col text-left">
+                <div className="flex items-center space-x-1.5">
+                  <span className="font-bold text-xs text-[#FFFFFF]">{currentAgent.name}</span>
+                  <ChevronDown className="w-3 h-3 text-[#8A8A8A]" />
+                </div>
+                <span className="text-[10px] text-[#7CFF00] font-mono leading-none">
+                  {agentRole === 'support_lead' ? 'Support Lead' : 'Support Agent'}
+                </span>
+              </div>
+            </button>
+
+            {agentDropdownOpen && (
+              <div className="absolute left-0 mt-2 w-56 bg-[#121212] border border-[#262626] rounded-xl shadow-2xl py-1.5 z-50 text-xs animate-fadeIn">
+                <div className="px-3 py-1 text-[10px] font-bold text-[#666666] uppercase tracking-wider border-b border-[#1E1E1E]">
+                  Switch Agent Identity
+                </div>
+                {DEMO_AGENTS_LIST.map((ag) => {
+                  const isSelected = currentAgent.id === ag.id;
+                  return (
+                    <button
+                      key={ag.id}
+                      id={`btn-switch-agent-${ag.id}`}
+                      onClick={() => handleSwitchAgent(ag)}
+                      className={`w-full flex items-center justify-between px-3 py-2 text-left transition-colors ${
+                        isSelected
+                          ? 'bg-[#7CFF00]/10 text-[#7CFF00] font-bold'
+                          : 'text-[#CCCCCC] hover:bg-[#1A1A1A] hover:text-[#FFFFFF]'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-2.5">
+                        <img src={ag.avatar} alt={ag.name} className="w-5 h-5 rounded-full object-cover" />
+                        <div className="flex flex-col">
+                          <span className="font-semibold text-xs text-white">{ag.name}</span>
+                          <span className="text-[10px] text-[#888888]">{ag.roleLabel}</span>
+                        </div>
+                      </div>
+                      {isSelected && <Check className="w-3.5 h-3.5 text-[#7CFF00]" />}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Configured Status Dropdown */}
@@ -816,7 +889,8 @@ export default function AgentDashboard({
               onTransferTicket={handleTransferTicket}
               onClaimTicket={handleClaimTicket}
               agentRoster={agentRoster}
-              currentAgentId="user_sarah_lin"
+              currentAgentId={currentAgent.id}
+              currentUserRole={agentRole}
               isCopilotOpen={isSplitView ? splitPanel === 'copilot' : isCopilotStandaloneOpen}
               onToggleCopilot={() => {
                 if (isSplitView) {

@@ -7,9 +7,9 @@ import { loadLanguageFromStorage, saveLanguageToStorage } from '../../client/src
 test('Resolve AI — Storefront Language Localization Suite', async (t) => {
 
   await t.test('1. Supported languages configuration & BCP-47 conformity', () => {
-    assert.strictEqual(SUPPORTED_LANGUAGES.length, 3, 'Exactly three languages configured');
+    assert.ok(SUPPORTED_LANGUAGES.length >= 3, 'Supported languages configured');
     const codes = SUPPORTED_LANGUAGES.map(l => l.code);
-    assert.deepStrictEqual(codes, ['en', 'hi', 'mr'], 'Languages must be English (en), Hindi (hi), and Marathi (mr)');
+    assert.ok(codes.includes('en') && codes.includes('hi') && codes.includes('mr'), 'Languages must include English (en), Hindi (hi), and Marathi (mr)');
 
     // Each language entry has label and native script
     for (const lang of SUPPORTED_LANGUAGES) {

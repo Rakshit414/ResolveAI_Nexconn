@@ -52,6 +52,7 @@ export default function ChatWindow({
   const [transferInternalNotes, setTransferInternalNotes] = useState('');
   const [isTransferring, setIsTransferring] = useState(false);
   const [transferError, setTransferError] = useState(null);
+  const [transferSuccess, setTransferSuccess] = useState(null);
 
   const messagesEndRef = useRef(null);
 
@@ -155,10 +156,15 @@ export default function ChatWindow({
           },
           internalNotes: transferInternalNotes.trim()
         });
-        setShowTransferModal(false);
-        setTargetAgentId('');
-        setTransferReason('');
-        setTransferInternalNotes('');
+        const selectedAgentObj = agentRoster.find(a => a.userId === targetAgentId);
+        setTransferSuccess({ targetName: selectedAgentObj?.displayName || targetAgentId });
+        setTimeout(() => {
+          setShowTransferModal(false);
+          setTransferSuccess(null);
+          setTargetAgentId('');
+          setTransferReason('');
+          setTransferInternalNotes('');
+        }, 1200);
       }
     } catch (err) {
       setTransferError(err.message || 'Transfer failed');
@@ -296,7 +302,7 @@ export default function ChatWindow({
           <div className="min-w-0">
             <div className="flex items-center space-x-2.5">
               <span className="font-bold text-base text-[#FFFFFF] truncate">{customer?.name}</span>
-              <span className="text-xs text-[#8A8A8A] font-mono shrink-0">({ticket?.orderId})</span>
+              <span dir="ltr" className="text-xs text-[#8A8A8A] font-mono shrink-0 [direction:ltr]">({ticket?.orderId})</span>
 
               {/* Single Prominent Status Indicator */}
               {!isResolved && (
@@ -723,85 +729,130 @@ export default function ChatWindow({
             <div className="flex items-center justify-between border-b border-[#1F2937] pb-3">
               <div className="flex items-center space-x-2">
                 <ArrowRightLeft className="w-4 h-4 text-[#38BDF8]" />
-                <span className="font-bold text-sm text-[#FFFFFF]">Transfer Ticket #{ticket.orderId}</span>
+                <span className="font-bold text-sm text-[#FFFFFF]">Transfer Ticket #{ticket.orderId || ticket.id}</span>
               </div>
               <button onClick={() => setShowTransferModal(false)} className="text-[#9CA3AF] hover:text-white">
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            {transferError && (
-              <div className="p-2.5 bg-[#450A0A] border border-[#991B1B] rounded-xl text-xs text-[#FCA5A5]">
-                {transferError}
+            <div className="flex items-center justify-between text-xs bg-[#0B0F17] border border-[#1F2937] rounded-xl px-3 py-2">
+              <span className="text-[#9CA3AF]">Current Assigned Agent:</span>
+              <span className="font-semibold text-white">{ticket.assignedAgent?.name || currentAgentId}</span>
+            </div>
+
+            {transferSuccess && (
+              <div className="p-3 bg-[#064E3B]/80 border border-[#059669] rounded-xl text-xs text-[#A7F3D0] flex items-center space-x-2 animate-fadeIn">
+                <CheckCircle2 className="w-4 h-4 text-[#34D399] shrink-0" />
+                <span>Ticket successfully transferred to {transferSuccess.targetName || 'receiving agent'}.</span>
               </div>
             )}
 
-            <form onSubmit={handleTransferSubmit} className="space-y-3 text-xs">
-              <div>
-                <label className="block text-[11px] font-semibold text-[#9CA3AF] mb-1">Target Agent</label>
-                <select
-                  required
-                  value={targetAgentId}
-                  onChange={(e) => setTargetAgentId(e.target.value)}
-                  className="w-full bg-[#0B0F17] border border-[#1F2937] focus:border-[#38BDF8] rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
-                >
-                  <option value="">Select an agent from roster...</option>
-                  {agentRoster
-                    .filter(a => a.userId !== currentAgentId && a.configuredStatus !== 'Offline')
-                    .map(agent => (
-                      <option key={agent.userId} value={agent.userId}>
-                        {agent.displayName} ({agent.configuredStatus} • Workload: {agent.activeTicketCount}/{agent.maxConcurrentTickets})
-                      </option>
-                    ))}
-                  {agentRoster.length === 0 && (
-                    <>
-                      <option value="user_carlos">Carlos Gomez (Available • Specialist)</option>
-                      <option value="user_elena">Elena Rostova (Available • Lead)</option>
-                    </>
+            {transferError && (
+              <div className="p-2.5 bg-[#450A0A] border border-[#991B1B] rounded-xl text-xs text-[#FCA5A5] flex items-center space-x-2 animate-fadeIn">
+                <AlertCircle className="w-4 h-4 text-[#EF4444] shrink-0" />
+                <span>{transferError}</span>
+              </div>
+            )}
+
+            {/* Check other agents in roster */}
+            {(() => {
+              const otherAgents = agentRoster.filter(a => a.userId !== currentAgentId);
+              const eligibleAgents = otherAgents.filter(a =>
+                (a.effectiveStatus === 'Available' || a.configuredStatus === 'Available') &&
+                a.activeTicketCount < a.maxConcurrentTickets
+              );
+              const noEligible = otherAgents.length > 0 && eligibleAgents.length === 0;
+
+              return (
+                <form onSubmit={handleTransferSubmit} className="space-y-3.5 text-xs">
+                  {noEligible && (
+                    <div className="p-2.5 bg-[#78350F]/40 border border-[#D97706] rounded-xl text-[11px] text-[#FDE68A] flex items-start space-x-2">
+                      <AlertCircle className="w-4 h-4 text-[#F59E0B] shrink-0 mt-0.5" />
+                      <span>No eligible agents available (all other agents are offline or at capacity).</span>
+                    </div>
                   )}
-                </select>
-              </div>
 
-              <div>
-                <label className="block text-[11px] font-semibold text-[#9CA3AF] mb-1">Handoff Summary / Reason</label>
-                <textarea
-                  required
-                  rows={3}
-                  value={transferReason}
-                  onChange={(e) => setTransferReason(e.target.value)}
-                  placeholder="Explain why this ticket is being transferred and customer situation..."
-                  className="w-full bg-[#0B0F17] border border-[#1F2937] focus:border-[#38BDF8] rounded-xl p-2.5 text-xs text-white focus:outline-none"
-                />
-              </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-[#9CA3AF] mb-1">Target Agent</label>
+                    <select
+                      id="select-target-agent"
+                      required
+                      value={targetAgentId}
+                      onChange={(e) => setTargetAgentId(e.target.value)}
+                      className="w-full bg-[#0B0F17] border border-[#1F2937] focus:border-[#38BDF8] rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                    >
+                      <option value="">Select an agent from roster...</option>
+                      {otherAgents.map(agent => {
+                        const isEligible = (agent.effectiveStatus === 'Available' || agent.configuredStatus === 'Available') &&
+                          agent.activeTicketCount < agent.maxConcurrentTickets;
+                        const roleLabel = agent.role === 'support_lead' ? 'Support Lead' : 'Support Agent';
+                        const statusLabel = agent.effectiveStatus || agent.configuredStatus;
+                        return (
+                          <option
+                            key={agent.userId}
+                            value={agent.userId}
+                            disabled={!isEligible}
+                          >
+                            {agent.displayName} — {roleLabel} ({statusLabel} • Workload: {agent.activeTicketCount}/{agent.maxConcurrentTickets}){isEligible ? '' : ' [Ineligible]'}
+                          </option>
+                        );
+                      })}
+                      {otherAgents.length === 0 && (
+                        <option value="" disabled>No other agents available in roster</option>
+                      )}
+                    </select>
+                  </div>
 
-              <div>
-                <label className="block text-[11px] font-semibold text-[#9CA3AF] mb-1">Internal Notes (Optional)</label>
-                <input
-                  type="text"
-                  value={transferInternalNotes}
-                  onChange={(e) => setTransferInternalNotes(e.target.value)}
-                  placeholder="Private guidance for receiving agent..."
-                  className="w-full bg-[#0B0F17] border border-[#1F2937] focus:border-[#38BDF8] rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
-                />
-              </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-[#9CA3AF] mb-1">
+                      Reason for Transfer <span className="text-[#EF4444]">*</span>
+                    </label>
+                    <textarea
+                      id="transfer-reason"
+                      required
+                      rows={3}
+                      value={transferReason}
+                      onChange={(e) => setTransferReason(e.target.value)}
+                      placeholder="Explain why this ticket is being transferred and customer situation..."
+                      className="w-full bg-[#0B0F17] border border-[#1F2937] focus:border-[#38BDF8] rounded-xl p-2.5 text-xs text-white focus:outline-none"
+                    />
+                  </div>
 
-              <div className="flex items-center justify-end space-x-2 pt-2 border-t border-[#1F2937]">
-                <button
-                  type="button"
-                  onClick={() => setShowTransferModal(false)}
-                  className="px-4 py-2 rounded-xl text-xs text-[#9CA3AF] hover:text-white transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isTransferring}
-                  className="px-4 py-2 rounded-xl bg-[#38BDF8] hover:bg-[#60A5FA] text-[#090909] text-xs font-bold transition-all shadow-md disabled:opacity-50"
-                >
-                  {isTransferring ? 'Transferring...' : 'Confirm Transfer'}
-                </button>
-              </div>
-            </form>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-[#9CA3AF] mb-1">
+                      Internal Notes <span className="text-[#6B7280]">(Private to agents — never sent to customer)</span>
+                    </label>
+                    <textarea
+                      id="transfer-internal-notes"
+                      rows={2}
+                      value={transferInternalNotes}
+                      onChange={(e) => setTransferInternalNotes(e.target.value)}
+                      placeholder="Private guidance and handoff notes for the receiving agent..."
+                      className="w-full bg-[#0B0F17] border border-[#1F2937] focus:border-[#38BDF8] rounded-xl p-2.5 text-xs text-white focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-end space-x-2 pt-2 border-t border-[#1F2937]">
+                    <button
+                      type="button"
+                      onClick={() => setShowTransferModal(false)}
+                      className="px-4 py-2 rounded-xl text-xs text-[#9CA3AF] hover:text-white transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      id="btn-confirm-transfer"
+                      disabled={isTransferring || !targetAgentId || !transferReason.trim()}
+                      className="px-4 py-2 rounded-xl bg-[#38BDF8] hover:bg-[#60A5FA] text-[#090909] text-xs font-bold transition-all shadow-md disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      {isTransferring ? 'Transferring...' : 'Confirm Transfer'}
+                    </button>
+                  </div>
+                </form>
+              );
+            })()}
           </div>
         </div>
       )}

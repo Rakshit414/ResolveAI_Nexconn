@@ -144,7 +144,7 @@ export async function transferTicketAtomically({
 
     // Step 1: Lock ticket row explicitly
     const ticketRes = await client.query(`
-      SELECT id, assigned_agent_id, status
+      SELECT id, customer_id, assigned_agent_id, status
       FROM tickets
       WHERE brand_id = $1 AND id = $2
       FOR UPDATE
@@ -168,7 +168,7 @@ export async function transferTicketAtomically({
       throw err;
     }
 
-    // Step 2: Lock active queue row
+    // Step 2: Lock active queue row (or insert assigned queue row if not present)
     const queueLock = await client.query(`
       SELECT id, status FROM ticket_routing_queue
       WHERE brand_id = $1 AND ticket_id = $2 AND status = 'assigned'
@@ -176,9 +176,12 @@ export async function transferTicketAtomically({
     `, [brandId, ticketId]);
 
     if (queueLock.rows.length === 0) {
-      const err = new Error('No active assigned queue entry found for ticket transfer');
-      err.statusCode = 400;
-      throw err;
+      const newQueueId = `q_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+      await client.query(`
+        INSERT INTO ticket_routing_queue (
+          id, brand_id, ticket_id, customer_id, priority, customer_language, required_skills, status, assigned_agent_id, assigned_at
+        ) VALUES ($1, $2, $3, $4, 'High', 'en-US', ARRAY['general_inquiry'], 'assigned', $5, NOW())
+      `, [newQueueId, brandId, ticketId, ticket.customer_id || 'cust_unknown', fromAgentId]);
     }
 
     // Step 3: Lock both Agent profiles in alphabetical user_id order
@@ -267,11 +270,27 @@ export async function transferTicketAtomically({
     `, [brandId, toAgentId]);
 
     const handoffId = `handoff_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+    const summaryObj = typeof handoffSummaryJson === 'object' && handoffSummaryJson !== null
+      ? handoffSummaryJson
+      : { reason: String(handoffSummaryJson || 'Transfer requested') };
+
+    const attemptedResolutions = summaryObj.attemptedResolutions || null;
+    const customerCommitments = summaryObj.customerCommitments || null;
+    const pendingActions = summaryObj.pendingActions || null;
+
     const handoffIns = await client.query(`
       INSERT INTO ticket_handoff_summaries (
-        id, brand_id, ticket_id, from_agent_id, to_agent_id, ai_summary_json, internal_notes
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-    `, [handoffId, brandId, ticketId, fromAgentId, toAgentId, JSON.stringify(handoffSummaryJson || {}), internalNotes]);
+        id, brand_id, ticket_id, from_agent_id, to_agent_id, ai_summary_json, internal_notes,
+        attempted_resolutions, customer_commitments, pending_actions
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+    `, [
+      handoffId, brandId, ticketId, fromAgentId, toAgentId,
+      JSON.stringify(summaryObj),
+      internalNotes || '',
+      attemptedResolutions,
+      customerCommitments,
+      pendingActions
+    ]);
 
     // Assert row counts on every actual database mutation (Zero invented row counts!)
     if (decrRes.rowCount !== 1 || incrRes.rowCount !== 1 || ticketUpd.rowCount !== 1 || queueUpd.rowCount !== 1 || handoffIns.rowCount !== 1) {

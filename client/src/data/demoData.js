@@ -175,3 +175,30 @@ export const DEMO_AGENT = {
   role: "Senior Support Specialist",
   department: "Customer Experience & Resolution"
 };
+
+export const DEMO_AGENTS_LIST = [
+  {
+    id: 'user_sarah_lin',
+    name: 'Sarah Lin',
+    role: 'support_lead',
+    roleLabel: 'Support Lead',
+    email: 'sarah.lin@novacart.com',
+    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80'
+  },
+  {
+    id: 'user_carlos',
+    name: 'Carlos Gomez',
+    role: 'agent',
+    roleLabel: 'Support Agent',
+    email: 'carlos.gomez@novacart.com',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80'
+  },
+  {
+    id: 'user_elena',
+    name: 'Elena Rodriguez',
+    role: 'agent',
+    roleLabel: 'Support Agent',
+    email: 'elena.rodriguez@novacart.com',
+    avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=150&q=80'
+  }
+];

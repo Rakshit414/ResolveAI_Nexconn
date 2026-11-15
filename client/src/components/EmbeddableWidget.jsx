@@ -444,6 +444,7 @@ export default function EmbeddableWidget({
   // Active Support Widget Container
   return (
     <div
+      dir={currentLang === 'ar' ? 'rtl' : 'ltr'}
       className={`flex flex-col bg-[#0C0C0C] text-[#FFFFFF] border border-[#222222] shadow-2xl transition-all duration-300 overflow-hidden ${
         isStandalone
           ? 'w-full h-full rounded-none'

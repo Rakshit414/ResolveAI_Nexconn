@@ -1,10 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import bcrypt from 'bcryptjs';
-import { DEMO_AGENTS, isValidBcryptHash, getAgentPasswordHash } from '../src/db/seedWorkforce.js';
+import { DEMO_AGENTS, isValidBcryptHash, getAgentPasswordHash, seedDemoWorkforce } from '../src/db/seedWorkforce.js';
 import { calculateEffectiveStatus } from '../src/services/agentAvailabilityService.js';
 import { maskCustomerPii } from '../src/services/sharedInboxService.js';
 import { DEMO_AGENTS_LIST } from '../../client/src/data/demoData.js';
+import { getSslConfigForUrl, parseHostnameFromUrl, isLocalhostDatabase } from '../src/db/pool.js';
 
 test('Resolve AI — Multi-Agent System Core Architecture & Invariant Unit Tests', async (t) => {
 
@@ -198,5 +199,133 @@ test('Resolve AI — Multi-Agent System Core Architecture & Invariant Unit Tests
       getAgentPasswordHash('user_elena', validHash);
     }, /Missing required environment variable/);
     process.env.NODE_ENV = prevEnv;
+  });
+
+  await t.test('8. seedWorkforce zero demo sessions, status preservation, initial defaults, and rollback', async () => {
+    // 8a & 8b: Execute seedWorkforce with a mock pool/client and verify SQL queries
+    const executedQueries = [];
+    const mockClient = {
+      connect: async () => ({
+        query: async (sql, params = []) => {
+          executedQueries.push({ sql: sql.trim(), params });
+          if (sql.includes('SELECT COUNT(*)')) {
+            return { rows: [{ cnt: 1 }] };
+          }
+          return { rowCount: 1, rows: [] };
+        },
+        release: () => {}
+      })
+    };
+
+    await seedDemoWorkforce(mockClient, 'brand_novacart');
+
+    // Confirm transaction began and committed
+    assert.strictEqual(executedQueries[0].sql, 'BEGIN');
+    assert.strictEqual(executedQueries[executedQueries.length - 1].sql, 'COMMIT');
+
+    // (a) Confirm seed script NEVER inserts demo sessions
+    const sessionQueries = executedQueries.filter(q => q.sql.includes('agent_sessions'));
+    assert.strictEqual(sessionQueries.length, 0, 'Seed script must never insert into agent_sessions');
+
+    // (b) Confirm existing agent sessions remain untouched (no UPDATE or DELETE on agent_sessions)
+    assert.strictEqual(executedQueries.some(q => q.sql.includes('UPDATE agent_sessions')), false);
+    assert.strictEqual(executedQueries.some(q => q.sql.includes('DELETE FROM agent_sessions')), false);
+
+    // (c) Confirm existing Away/Busy statuses and last_heartbeat_at are preserved on conflict
+    const profileUpserts = executedQueries.filter(q => q.sql.includes('agent_profiles'));
+    assert.strictEqual(profileUpserts.length, 3, 'Must upsert 3 agent profiles');
+    for (const q of profileUpserts) {
+      assert.ok(q.sql.includes('ON CONFLICT (brand_id, user_id) DO UPDATE SET'));
+      // The update clause must NOT touch configured_status, status_reason, or last_heartbeat_at
+      const onConflictPart = q.sql.split('ON CONFLICT (brand_id, user_id) DO UPDATE SET')[1];
+      assert.strictEqual(onConflictPart.includes('configured_status'), false, 'ON CONFLICT must not overwrite configured_status');
+      assert.strictEqual(onConflictPart.includes('status_reason'), false, 'ON CONFLICT must not overwrite status_reason');
+      assert.strictEqual(onConflictPart.includes('last_heartbeat_at'), false, 'ON CONFLICT must not overwrite last_heartbeat_at');
+    }
+
+    // (d) Confirm new profiles receive appropriate initial defaults
+    for (const q of profileUpserts) {
+      // In the VALUES clause, configured_status is Offline and last_heartbeat_at is NULL
+      assert.ok(q.sql.includes('Initial workforce provisioning'));
+      assert.ok(q.sql.includes('NULL')); // for last_heartbeat_at
+      assert.strictEqual(q.params[5], 'Offline', 'Default configured status for new profiles must be Offline');
+    }
+
+    // (e) Invalid bcrypt hashes fail before any database changes
+    process.env.AGENT_SARAH_PASSWORD_HASH = 'invalid_hash';
+    const cleanClient = {
+      query: async (sql) => {
+        executedQueries.push({ sql: sql.trim() });
+        return { rowCount: 1, rows: [] };
+      }
+    };
+    await assert.rejects(async () => {
+      await seedDemoWorkforce(cleanClient, 'brand_novacart');
+    }, /Invalid bcrypt hash format/);
+    delete process.env.AGENT_SARAH_PASSWORD_HASH;
+
+    // (f) Failed provisioning rolls back the entire transaction
+    const failingQueries = [];
+    const failingClient = {
+      connect: async () => ({
+        query: async (sql) => {
+          failingQueries.push(sql.trim());
+          if (sql.includes('INSERT INTO users')) {
+            throw new Error('Database disk error');
+          }
+          return { rowCount: 1, rows: [] };
+        },
+        release: () => {}
+      })
+    };
+
+    await assert.rejects(async () => {
+      await seedDemoWorkforce(failingClient, 'brand_novacart');
+    }, /Database disk error/);
+
+    assert.strictEqual(failingQueries[0], 'BEGIN');
+    assert.strictEqual(failingQueries[failingQueries.length - 1], 'ROLLBACK', 'Failed transaction must issue ROLLBACK');
+  });
+
+  await t.test('9. TLS certificate verification for external production connections and exact hostname matching', () => {
+    // 9a: Exact hostname parsing: localhost, 127.0.0.1, ::1
+    assert.strictEqual(parseHostnameFromUrl('postgresql://postgres:password@localhost:5432/postgres'), 'localhost');
+    assert.strictEqual(parseHostnameFromUrl('postgresql://postgres:password@127.0.0.1:5432/postgres'), '127.0.0.1');
+    assert.strictEqual(parseHostnameFromUrl('postgresql://postgres:password@[::1]:5432/postgres'), '::1');
+    assert.strictEqual(isLocalhostDatabase('postgresql://postgres:password@localhost:5432/postgres'), true);
+    assert.strictEqual(isLocalhostDatabase('postgresql://postgres:password@127.0.0.1:5432/postgres'), true);
+    assert.strictEqual(isLocalhostDatabase('postgresql://postgres:password@[::1]:5432/postgres'), true);
+
+    // Localhost connections do not require TLS
+    assert.strictEqual(getSslConfigForUrl('postgresql://postgres:password@localhost:5432/postgres'), false);
+    assert.strictEqual(getSslConfigForUrl('postgresql://postgres:password@127.0.0.1:5432/postgres'), false);
+    assert.strictEqual(getSslConfigForUrl('postgresql://postgres:password@[::1]:5432/postgres'), false);
+
+    // 9b: Substring lookalikes must NOT match localhost and must enforce verified TLS
+    const lookalikes = [
+      'postgresql://postgres:password@localhost.attacker.com:5432/postgres',
+      'postgresql://postgres:password@evil-127.0.0.1.attacker.com:5432/postgres',
+      'postgresql://postgres:password@attacker::1.com:5432/postgres'
+    ];
+    for (const lookalike of lookalikes) {
+      assert.strictEqual(isLocalhostDatabase(lookalike), false, `Lookalike ${lookalike} must not be treated as localhost`);
+      const lookalikeSsl = getSslConfigForUrl(lookalike);
+      assert.ok(lookalikeSsl && typeof lookalikeSsl === 'object');
+      assert.strictEqual(lookalikeSsl.rejectUnauthorized, true, `Lookalike ${lookalike} must enforce rejectUnauthorized: true`);
+    }
+
+    // 9c: External / Remote database URLs (e.g. Render) must enforce rejectUnauthorized: true
+    const renderExternalUrl = 'postgresql://testuser:password@dpg-mock-instance.oregon-postgres.render.com:5432/testdb?sslmode=require';
+    assert.strictEqual(isLocalhostDatabase(renderExternalUrl), false);
+    const sslConfig = getSslConfigForUrl(renderExternalUrl);
+    assert.ok(sslConfig && typeof sslConfig === 'object');
+    assert.strictEqual(sslConfig.rejectUnauthorized, true, 'rejectUnauthorized must be true for external database connections');
+
+    // 9d: Custom CA bundle is included when provided
+    process.env.PG_CA_CERT = '-----BEGIN CERTIFICATE-----\nMOCK\n-----END CERTIFICATE-----';
+    const sslWithCa = getSslConfigForUrl(renderExternalUrl);
+    assert.strictEqual(sslWithCa.rejectUnauthorized, true);
+    assert.strictEqual(sslWithCa.ca, process.env.PG_CA_CERT);
+    delete process.env.PG_CA_CERT;
   });
 });

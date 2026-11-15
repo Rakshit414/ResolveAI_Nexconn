@@ -1,5 +1,4 @@
 // server/src/db/seedWorkforce.js
-import crypto from 'crypto';
 import { getPool } from './pool.js';
 
 export function isValidBcryptHash(hash) {
@@ -41,7 +40,7 @@ export const DEMO_AGENTS = [
     email: 'sarah.lin@novacart.com',
     name: 'Sarah Lin',
     role: 'support_lead',
-    configuredStatus: 'Available',
+    configuredStatus: 'Offline',
     primaryLanguage: 'en-US',
     supportedLanguages: ['en-US', 'hi-IN', 'mr-IN', 'es-ES'],
     skills: ['general_inquiry', 'returns', 'logistics', 'damages'],
@@ -55,7 +54,7 @@ export const DEMO_AGENTS = [
     email: 'carlos.gomez@novacart.com',
     name: 'Carlos Gomez',
     role: 'agent',
-    configuredStatus: 'Available',
+    configuredStatus: 'Offline',
     primaryLanguage: 'es-ES',
     supportedLanguages: ['es-ES', 'en-US', 'pt-BR'],
     skills: ['returns', 'billing', 'logistics'],
@@ -69,7 +68,7 @@ export const DEMO_AGENTS = [
     email: 'elena.rodriguez@novacart.com',
     name: 'Elena Rodriguez',
     role: 'agent',
-    configuredStatus: 'Available',
+    configuredStatus: 'Offline',
     primaryLanguage: 'en-US',
     supportedLanguages: ['en-US', 'de-DE', 'fr-FR'],
     skills: ['general_inquiry', 'damages', 'escalations'],
@@ -134,9 +133,9 @@ export async function seedDemoWorkforce(clientOrPool = null, brandId = 'brand_no
           skills, max_concurrent_tickets, active_ticket_count, last_heartbeat_at
         ) VALUES (
           $1, $2, $3, $4, $5,
-          $6, 'Available for assignment', $7, $8,
+          $6, 'Initial workforce provisioning', $7, $8,
           $9, $10, $11,
-          NOW()
+          NULL
         )
         ON CONFLICT (brand_id, user_id) DO UPDATE SET
           nexconn_user_id = EXCLUDED.nexconn_user_id,
@@ -146,40 +145,20 @@ export async function seedDemoWorkforce(clientOrPool = null, brandId = 'brand_no
           supported_languages = EXCLUDED.supported_languages,
           skills = EXCLUDED.skills,
           max_concurrent_tickets = EXCLUDED.max_concurrent_tickets,
-          last_heartbeat_at = NOW()
+          active_ticket_count = EXCLUDED.active_ticket_count
       `, [
         brandId,
         agent.userId,
         agent.nexconnUserId,
         agent.name,
         agent.avatarUrl,
-        agent.configuredStatus,
+        agent.configuredStatus || 'Offline',
         agent.primaryLanguage,
         agent.supportedLanguages,
         agent.skills,
         agent.maxConcurrentTickets,
         activeCount
       ]);
-
-      // 4. Ensure active session exists in agent_sessions so agents are immediately eligible and online
-      const sessId = `sess_demo_${agent.userId.replace('user_', '')}_${brandId}`;
-      const token = `agent_sess_demo_${agent.userId.replace('user_', '')}`;
-      const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-      await client.query(`
-        INSERT INTO agent_sessions (id, brand_id, user_id, session_token_hash, csrf_token, ip_address, user_agent, expires_at)
-        VALUES ($1, $2, $3, $4, 'csrf_demo_token', '127.0.0.1', 'Demo/Seed', NOW() + INTERVAL '7 days')
-        ON CONFLICT (id) DO UPDATE SET
-          expires_at = NOW() + INTERVAL '7 days',
-          revoked_at = NULL
-      `, [sessId, brandId, agent.userId, tokenHash]);
-
-      // Keep heartbeat updated
-      await client.query(`
-        UPDATE agent_profiles
-        SET last_heartbeat_at = NOW(),
-            configured_status = 'Available'
-        WHERE brand_id = $1 AND user_id = $2
-      `, [brandId, agent.userId]);
     }
 
     if (shouldManageTx) await client.query('COMMIT');

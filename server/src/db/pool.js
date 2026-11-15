@@ -6,9 +6,45 @@ dotenv.config();
 
 const require = createRequire(import.meta.url);
 const { Pool } = pg;
+const { parse: parseConnectionString } = require('pg-connection-string');
 
 let pool = null;
 let inMemoryDb = null;
+
+export function parseHostnameFromUrl(databaseUrl) {
+  if (!databaseUrl || typeof databaseUrl !== 'string') return null;
+  try {
+    const parsed = new URL(databaseUrl);
+    return parsed.hostname.replace(/^\[|\]$/g, '').toLowerCase();
+  } catch {
+    try {
+      const parsed = parseConnectionString(databaseUrl);
+      return (parsed.host || '').replace(/^\[|\]$/g, '').toLowerCase() || null;
+    } catch {
+      const match = databaseUrl.match(/@([^/?#:]+)/);
+      if (match && match[1]) {
+        return match[1].replace(/^\[|\]$/g, '').toLowerCase();
+      }
+      return null;
+    }
+  }
+}
+
+export function isLocalhostDatabase(databaseUrl) {
+  const hostname = parseHostnameFromUrl(databaseUrl);
+  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
+}
+
+export function getSslConfigForUrl(databaseUrl) {
+  if (!databaseUrl) return false;
+  if (isLocalhostDatabase(databaseUrl)) return false;
+
+  const caCert = process.env.PG_CA_CERT || process.env.DATABASE_CA_CERT;
+  return {
+    rejectUnauthorized: true,
+    ...(caCert ? { ca: caCert } : {})
+  };
+}
 
 export function getPool() {
   if (pool) return pool;
@@ -16,17 +52,28 @@ export function getPool() {
   const databaseUrl = process.env.DATABASE_URL;
 
   if (databaseUrl) {
-    // Production / Dedicated PostgreSQL Pool
-    const isLocalhost = databaseUrl.includes('localhost') || databaseUrl.includes('127.0.0.1');
-    const useSsl = process.env.NODE_ENV === 'production' && !isLocalhost && !databaseUrl.includes('sslmode=disable');
+    // Dedicated PostgreSQL Pool with verified TLS for remote hosts
+    const sslConfig = getSslConfigForUrl(databaseUrl);
 
-    pool = new Pool({
-      connectionString: databaseUrl,
-      ssl: useSsl ? { rejectUnauthorized: false } : false,
+    let poolConfig = {
+      ssl: sslConfig,
       max: 20,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 5000,
-    });
+    };
+
+    try {
+      const parsedConfig = parseConnectionString(databaseUrl);
+      delete parsedConfig.ssl;
+      poolConfig = {
+        ...parsedConfig,
+        ...poolConfig,
+      };
+    } catch {
+      poolConfig.connectionString = databaseUrl;
+    }
+
+    pool = new Pool(poolConfig);
 
     pool.on('error', (err) => {
       console.error('[DB Pool] Unexpected error on idle client:', err.message);
@@ -92,6 +139,9 @@ export async function closePool() {
 }
 
 export default {
+  parseHostnameFromUrl,
+  isLocalhostDatabase,
+  getSslConfigForUrl,
   getPool,
   query,
   healthCheck,

@@ -1,5 +1,63 @@
 // server/src/db/seedWorkforce.js
-import { getPool } from './pool.js';
+import pg from 'pg';
+import { getPool, closePool } from './pool.js';
+
+export function isDirectPostgresClient(clientOrPool) {
+  if (!clientOrPool || typeof clientOrPool.query !== 'function') {
+    return false;
+  }
+
+  // 1. Native pg class instances
+  if (pg?.Client && clientOrPool instanceof pg.Client) {
+    return true;
+  }
+  if (pg?.Pool && clientOrPool instanceof pg.Pool) {
+    return false;
+  }
+
+  // 2. Explicit caller hints
+  if (clientOrPool.isDirectClient === true) {
+    return true;
+  }
+  if (clientOrPool.isPool === true) {
+    return false;
+  }
+
+  // 3. Pool structural signatures (pg-pool exposes pool counters and client array)
+  if (
+    typeof clientOrPool.totalCount === 'number' ||
+    typeof clientOrPool.idleCount === 'number' ||
+    typeof clientOrPool.waitingCount === 'number' ||
+    Array.isArray(clientOrPool._clients)
+  ) {
+    return false;
+  }
+
+  // 4. Client structural signatures (native pg.Client properties and methods)
+  if (
+    typeof clientOrPool.escapeLiteral === 'function' ||
+    typeof clientOrPool.escapeIdentifier === 'function' ||
+    clientOrPool.connectionParameters !== undefined ||
+    typeof clientOrPool._queryable === 'boolean'
+  ) {
+    return true;
+  }
+
+  // 5. Duck-typing for mocks: if it lacks connect(), it must be a direct client
+  if (typeof clientOrPool.connect !== 'function') {
+    return true;
+  }
+
+  // Fallback: has connect() and no client signatures -> treat as Pool
+  return false;
+}
+
+export function sanitizeDiagnosticText(text) {
+  if (typeof text !== 'string') return text;
+  return text
+    .replace(/(postgres(?:ql)?:\/\/[^:]+:)([^@]+)(@)/gi, '$1***$3')
+    .replace(/\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}/g, '[REDACTED_HASH]');
+}
 
 export function isValidBcryptHash(hash) {
   return typeof hash === 'string' && /^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$/.test(hash);
@@ -133,11 +191,14 @@ export async function seedDemoWorkforce(clientOrPool = null, brandId = 'brand_no
   const pool = clientOrPool || getPool();
   if (!pool) return;
 
-  const isDirectClient = typeof clientOrPool?.query === 'function' && typeof clientOrPool?.release !== 'function';
-  const client = isDirectClient ? clientOrPool : await pool.connect();
+  const isDirectClient = isDirectPostgresClient(clientOrPool);
   const shouldManageTx = !isDirectClient;
+  let client = null;
+  let txError = null;
 
   try {
+    client = isDirectClient ? clientOrPool : await pool.connect();
+
     if (shouldManageTx) await client.query('BEGIN');
 
     for (const agent of DEMO_AGENTS) {
@@ -210,11 +271,51 @@ export async function seedDemoWorkforce(clientOrPool = null, brandId = 'brand_no
     if (shouldManageTx) await client.query('COMMIT');
     console.log(`[seedDemoWorkforce] Verified ${DEMO_AGENTS.length} agents seeded transactionally for brand: ${brandId}`);
   } catch (err) {
-    if (shouldManageTx) await client.query('ROLLBACK');
+    txError = err;
+    if (client && shouldManageTx) {
+      try {
+        await client.query('ROLLBACK');
+      } catch (rollbackErr) {
+        // Rollback failure must not hide or replace the original transaction error
+      }
+    }
     throw err;
   } finally {
-    if (shouldManageTx) client.release();
+    if (client && shouldManageTx && typeof client.release === 'function') {
+      if (txError) {
+        client.release(txError);
+      } else {
+        client.release();
+      }
+    }
   }
+}
+
+export async function runWorkforceSeedCli(clientOrPool = null) {
+  let exitCode = 0;
+  try {
+    await seedDemoWorkforce(clientOrPool);
+    console.log('[CLI] Demo workforce seeded successfully.');
+  } catch (err) {
+    exitCode = 1;
+    process.exitCode = 1;
+    const sanitizedMsg = sanitizeDiagnosticText(err?.message || String(err));
+    const sanitizedStack = sanitizeDiagnosticText(err?.stack || '');
+    console.error('[CLI] Demo workforce seeding failed:', sanitizedMsg);
+    if (sanitizedStack) {
+      console.error(sanitizedStack);
+    }
+  } finally {
+    try {
+      await closePool();
+    } catch (closeErr) {
+      exitCode = 1;
+      process.exitCode = 1;
+      const sanitizedCloseMsg = sanitizeDiagnosticText(closeErr?.message || String(closeErr));
+      console.error('[CLI] Error closing connection pool:', sanitizedCloseMsg);
+    }
+  }
+  return exitCode;
 }
 
 export default {
@@ -222,17 +323,12 @@ export default {
   getAgentPasswordHash,
   resolveAndValidateWorkforceHashes,
   DEMO_AGENTS,
-  seedDemoWorkforce
+  seedDemoWorkforce,
+  isDirectPostgresClient,
+  sanitizeDiagnosticText,
+  runWorkforceSeedCli
 };
 
 if (process.argv[1] && (process.argv[1].endsWith('seedWorkforce.js') || process.argv[1].endsWith('seedWorkforce.mjs'))) {
-  seedDemoWorkforce()
-    .then(() => {
-      console.log('[CLI] Demo workforce seeded successfully.');
-      process.exit(0);
-    })
-    .catch((err) => {
-      console.error('[CLI] Demo workforce seeding failed:', err.message);
-      process.exit(1);
-    });
+  runWorkforceSeedCli();
 }

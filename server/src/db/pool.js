@@ -66,6 +66,18 @@ export function getSslConfigForUrl(databaseUrl) {
   };
 }
 
+export function getConnectionTimeoutMillis() {
+  const rawTimeout = process.env.PG_CONNECT_TIMEOUT_MS;
+  if (rawTimeout !== undefined && rawTimeout !== null && String(rawTimeout).trim() !== '') {
+    const parsed = Number(rawTimeout);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      throw new Error(`[DB Pool] Invalid PG_CONNECT_TIMEOUT_MS: "${rawTimeout}". Must be a positive finite number.`);
+    }
+    return parsed;
+  }
+  return 20000;
+}
+
 export function getPool() {
   if (pool) return pool;
 
@@ -74,12 +86,13 @@ export function getPool() {
   if (databaseUrl) {
     // Dedicated PostgreSQL Pool with verified TLS for remote hosts
     const sslConfig = getSslConfigForUrl(databaseUrl);
+    const connectionTimeout = getConnectionTimeoutMillis();
 
     let poolConfig = {
       ssl: sslConfig,
       max: 20,
       idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 5000,
+      connectionTimeoutMillis: connectionTimeout,
     };
 
     try {
@@ -162,6 +175,7 @@ export default {
   parseHostnameFromUrl,
   isLocalhostDatabase,
   getSslConfigForUrl,
+  getConnectionTimeoutMillis,
   getPool,
   query,
   healthCheck,

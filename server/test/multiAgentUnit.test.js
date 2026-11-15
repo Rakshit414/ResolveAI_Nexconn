@@ -1,11 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import bcrypt from 'bcryptjs';
-import { DEMO_AGENTS, isValidBcryptHash, getAgentPasswordHash, resolveAndValidateWorkforceHashes, seedDemoWorkforce } from '../src/db/seedWorkforce.js';
+import pg from 'pg';
+import { DEMO_AGENTS, isValidBcryptHash, getAgentPasswordHash, resolveAndValidateWorkforceHashes, seedDemoWorkforce, sanitizeDiagnosticText, runWorkforceSeedCli, isDirectPostgresClient } from '../src/db/seedWorkforce.js';
 import { calculateEffectiveStatus } from '../src/services/agentAvailabilityService.js';
 import { maskCustomerPii } from '../src/services/sharedInboxService.js';
 import { DEMO_AGENTS_LIST } from '../../client/src/data/demoData.js';
-import { getSslConfigForUrl, parseHostnameFromUrl, isLocalhostDatabase } from '../src/db/pool.js';
+import { getSslConfigForUrl, parseHostnameFromUrl, isLocalhostDatabase, getConnectionTimeoutMillis, closePool, getPool } from '../src/db/pool.js';
 
 test('Resolve AI — Multi-Agent System Core Architecture & Invariant Unit Tests', async (t) => {
 
@@ -268,6 +269,7 @@ test('Resolve AI — Multi-Agent System Core Architecture & Invariant Unit Tests
   await t.test('8. seedWorkforce zero demo sessions, status preservation, initial defaults, and rollback', async () => {
     // 8a & 8b: Execute seedWorkforce with a mock pool/client and verify SQL queries
     const executedQueries = [];
+    let mockClientReleasedWith = 'not_called';
     const mockClient = {
       connect: async () => ({
         query: async (sql, params = []) => {
@@ -277,7 +279,9 @@ test('Resolve AI — Multi-Agent System Core Architecture & Invariant Unit Tests
           }
           return { rowCount: 1, rows: [] };
         },
-        release: () => {}
+        release: (err) => {
+          mockClientReleasedWith = err;
+        }
       })
     };
 
@@ -286,6 +290,7 @@ test('Resolve AI — Multi-Agent System Core Architecture & Invariant Unit Tests
     // Confirm transaction began and committed
     assert.strictEqual(executedQueries[0].sql, 'BEGIN');
     assert.strictEqual(executedQueries[executedQueries.length - 1].sql, 'COMMIT');
+    assert.strictEqual(mockClientReleasedWith, undefined, 'Successful client must be released normally without error');
 
     // (a) Confirm seed script NEVER inserts demo sessions
     const sessionQueries = executedQueries.filter(q => q.sql.includes('agent_sessions'));
@@ -328,8 +333,9 @@ test('Resolve AI — Multi-Agent System Core Architecture & Invariant Unit Tests
     }, /Invalid bcrypt hash format/);
     delete process.env.AGENT_SARAH_PASSWORD_HASH;
 
-    // (f) Failed provisioning rolls back the entire transaction
+    // (f) Failed provisioning rolls back the entire transaction and releases client with original error
     const failingQueries = [];
+    let failingClientReleasedWith = null;
     const failingClient = {
       connect: async () => ({
         query: async (sql) => {
@@ -339,7 +345,9 @@ test('Resolve AI — Multi-Agent System Core Architecture & Invariant Unit Tests
           }
           return { rowCount: 1, rows: [] };
         },
-        release: () => {}
+        release: (err) => {
+          failingClientReleasedWith = err;
+        }
       })
     };
 
@@ -349,6 +357,138 @@ test('Resolve AI — Multi-Agent System Core Architecture & Invariant Unit Tests
 
     assert.strictEqual(failingQueries[0], 'BEGIN');
     assert.strictEqual(failingQueries[failingQueries.length - 1], 'ROLLBACK', 'Failed transaction must issue ROLLBACK');
+    assert.ok(failingClientReleasedWith instanceof Error, 'Failed client must be released with error');
+    assert.strictEqual(failingClientReleasedWith.message, 'Database disk error', 'Failed client must be released with original error');
+
+    // (g) Rollback failure does NOT hide or overwrite the original transaction error
+    let rollbackFailingReleasedWith = null;
+    const rollbackFailingClient = {
+      connect: async () => ({
+        query: async (sql) => {
+          if (sql.includes('INSERT INTO users')) {
+            throw new Error('Primary transaction deadlock');
+          }
+          if (sql.trim() === 'ROLLBACK') {
+            throw new Error('Connection terminated unexpectedly during rollback');
+          }
+          return { rowCount: 1, rows: [] };
+        },
+        release: (err) => {
+          rollbackFailingReleasedWith = err;
+        }
+      })
+    };
+
+    await assert.rejects(async () => {
+      await seedDemoWorkforce(rollbackFailingClient, 'brand_novacart');
+    }, (err) => {
+      assert.strictEqual(err.message, 'Primary transaction deadlock', 'Rollback failure must not hide primary error');
+      return true;
+    });
+    assert.ok(rollbackFailingReleasedWith instanceof Error);
+    assert.strictEqual(rollbackFailingReleasedWith.message, 'Primary transaction deadlock', 'Client must be released with original error even if rollback fails');
+
+    // (h) Externally supplied direct clients must NOT be released, checked out again, or manage transactions
+    let directClientReleased = false;
+    const directClient = {
+      query: async (sql) => {
+        if (sql.includes('SELECT COUNT(*)')) {
+          return { rows: [{ cnt: 0 }] };
+        }
+        return { rowCount: 1, rows: [] };
+      },
+      release: () => {
+        directClientReleased = true;
+      }
+    };
+    await seedDemoWorkforce(directClient, 'brand_novacart');
+    assert.strictEqual(directClientReleased, false, 'Externally supplied direct client must not be released on success');
+
+    let directFailingReleased = false;
+    const failingDirectClient = {
+      query: async (sql) => {
+        if (sql.includes('INSERT INTO users')) {
+          throw new Error('Direct client write failure');
+        }
+        return { rowCount: 1, rows: [] };
+      },
+      release: () => {
+        directFailingReleased = true;
+      }
+    };
+    await assert.rejects(async () => {
+      await seedDemoWorkforce(failingDirectClient, 'brand_novacart');
+    }, /Direct client write failure/);
+    assert.strictEqual(directFailingReleased, false, 'Externally supplied direct client must not be released on failure');
+
+    // (h1) Regression test: Actual installed pg.Client instance exposes both query() and connect()
+    // It must be correctly recognized as a direct client, never re-connected via connect(), and never released.
+    const nativeClient = new pg.Client();
+    nativeClient._connected = true;
+    let nativeConnectCalled = false;
+    let nativeReleaseCalled = false;
+    const nativeQueries = [];
+
+    nativeClient.connect = async () => {
+      nativeConnectCalled = true;
+      throw new Error('Native client should not be re-connected or checked out!');
+    };
+    nativeClient.release = () => {
+      nativeReleaseCalled = true;
+      throw new Error('Native client should not be released by seeding function!');
+    };
+    nativeClient.query = async (sql, params = []) => {
+      nativeQueries.push({ sql: sql.trim(), params });
+      if (sql.includes('SELECT COUNT(*)')) {
+        return { rows: [{ cnt: 0 }] };
+      }
+      return { rowCount: 1, rows: [] };
+    };
+
+    assert.strictEqual(typeof nativeClient.query, 'function');
+    assert.strictEqual(typeof nativeClient.connect, 'function', 'Native pg.Client defines connect()');
+    assert.strictEqual(isDirectPostgresClient(nativeClient), true, 'Native pg.Client must be recognized as direct client');
+
+    await seedDemoWorkforce(nativeClient, 'brand_novacart');
+    assert.strictEqual(nativeConnectCalled, false, 'Direct pg.Client must NOT have connect() called');
+    assert.strictEqual(nativeReleaseCalled, false, 'Direct pg.Client must NOT be released');
+    assert.strictEqual(nativeQueries.some(q => q.sql === 'BEGIN'), false, 'Direct client must not execute BEGIN');
+    assert.strictEqual(nativeQueries.some(q => q.sql === 'COMMIT'), false, 'Direct client must not execute COMMIT');
+    assert.ok(nativeQueries.length > 0, 'Direct client must receive provisioning queries');
+
+    // (h2) Regression test: On failure, native pg.Client is not released and error propagates cleanly
+    const failingNativeClient = new pg.Client();
+    failingNativeClient._connected = true;
+    let failingNativeReleaseCalled = false;
+    failingNativeClient.release = () => {
+      failingNativeReleaseCalled = true;
+    };
+    failingNativeClient.query = async (sql) => {
+      if (sql.includes('INSERT INTO users')) {
+        throw new Error('Native client query write error');
+      }
+      return { rowCount: 1, rows: [] };
+    };
+
+    await assert.rejects(async () => {
+      await seedDemoWorkforce(failingNativeClient, 'brand_novacart');
+    }, /Native client query write error/);
+    assert.strictEqual(failingNativeReleaseCalled, false, 'Native direct client must not be released on failure');
+
+    // (h3) Native pg.Pool is recognized as a Pool (NOT a direct client)
+    const nativePool = new pg.Pool();
+    assert.strictEqual(isDirectPostgresClient(nativePool), false, 'Native pg.Pool must NOT be classified as direct client');
+    nativePool.end();
+
+    // (i) Connection acquisition failure is handled safely without rollback or release crash
+    const acquisitionFailingPool = {
+      connect: async () => {
+        throw new Error('Connection acquisition timeout');
+      }
+    };
+    await assert.rejects(async () => {
+      await seedDemoWorkforce(acquisitionFailingPool, 'brand_novacart');
+    }, /Connection acquisition timeout/);
   });
 
   await t.test('9. Explicit SSL connection modes, exact localhost matching, and safe Render configuration', () => {
@@ -449,6 +589,93 @@ test('Resolve AI — Multi-Agent System Core Architecture & Invariant Unit Tests
       if (origSslMode !== undefined) process.env.DATABASE_SSL_MODE = origSslMode; else delete process.env.DATABASE_SSL_MODE;
       if (origRender !== undefined) process.env.RENDER = origRender; else delete process.env.RENDER;
       if (origCaCert !== undefined) process.env.PG_CA_CERT = origCaCert; else delete process.env.PG_CA_CERT;
+    }
+  });
+
+  await t.test('10. Connection timeout configuration, validation, and CLI lifecycle', async () => {
+    const origTimeout = process.env.PG_CONNECT_TIMEOUT_MS;
+    try {
+      // 10a: Connection timeout default is 20000 ms
+      delete process.env.PG_CONNECT_TIMEOUT_MS;
+      assert.strictEqual(getConnectionTimeoutMillis(), 20000, 'Default connection timeout must be 20000 ms');
+
+      // 10b: Connection timeout environment override
+      process.env.PG_CONNECT_TIMEOUT_MS = '15000';
+      assert.strictEqual(getConnectionTimeoutMillis(), 15000, 'Environment override must be respected');
+
+      process.env.PG_CONNECT_TIMEOUT_MS = ' 30000 ';
+      assert.strictEqual(getConnectionTimeoutMillis(), 30000, 'Trimmed positive numeric string must be parsed');
+
+      // 10c: Invalid timeout values fail safely
+      const invalidTimeouts = ['invalid', '-5000', '0', 'NaN', 'Infinity', '-Infinity'];
+      for (const val of invalidTimeouts) {
+        process.env.PG_CONNECT_TIMEOUT_MS = val;
+        assert.throws(() => {
+          getConnectionTimeoutMillis();
+        }, /Invalid PG_CONNECT_TIMEOUT_MS/, `Timeout value "${val}" must fail safely`);
+      }
+
+      // Empty string reverts to default
+      process.env.PG_CONNECT_TIMEOUT_MS = '';
+      assert.strictEqual(getConnectionTimeoutMillis(), 20000, 'Empty string must fall back to default');
+    } finally {
+      if (origTimeout !== undefined) {
+        process.env.PG_CONNECT_TIMEOUT_MS = origTimeout;
+      } else {
+        delete process.env.PG_CONNECT_TIMEOUT_MS;
+      }
+    }
+
+    // 10d: Diagnostic sanitization prevents credential and password hash leakage
+    const proto = 'postgres' + 'ql';
+    const testUrlErr = `Connection failed to ${proto}://admin:dummy_cleartext_secret@dpg-abc-a.oregon-postgres.render.com:5432/mydb`;
+    const sanitizedUrl = sanitizeDiagnosticText(testUrlErr);
+    assert.strictEqual(sanitizedUrl.includes('dummy_cleartext_secret'), false, 'Database password must be redacted');
+    assert.ok(sanitizedUrl.includes('admin:***@'), 'URL password must be masked with ***');
+
+    const testHashErr = 'Failed to insert hash $2b$10$aX/P2ZbWKxWVNqUzSYZcq.MRg4nQLiV8hHS6faZE0nOeZHu8u73oe into users';
+    const sanitizedHash = sanitizeDiagnosticText(testHashErr);
+    assert.strictEqual(sanitizedHash.includes('$2b$10$aX/P2ZbWKxWVNqUzSYZcq.MRg4nQLiV8hHS6faZE0nOeZHu8u73oe'), false);
+    assert.ok(sanitizedHash.includes('[REDACTED_HASH]'), 'Bcrypt hash must be redacted');
+
+    // 10e: CLI lifecycle closes pool on success and failure without premature process.exit
+    const origExitCode = process.exitCode;
+    const origNodeEnv = process.env.NODE_ENV;
+    try {
+      // CLI failure case: mock pool that fails on query
+      process.env.NODE_ENV = 'development';
+      const mockFailPool = {
+        connect: async () => ({
+          query: async () => {
+            throw new Error('Database connection failed');
+          },
+          release: () => {}
+        })
+      };
+
+      const failExitCode = await runWorkforceSeedCli(mockFailPool);
+      assert.strictEqual(failExitCode, 1, 'CLI must return exitCode 1 on error');
+      assert.strictEqual(process.exitCode, 1, 'process.exitCode must be set to 1 on failure');
+
+      // CLI success case: mock pool that succeeds
+      process.exitCode = 0;
+      const mockSuccessPool = {
+        connect: async () => ({
+          query: async (sql) => {
+            if (sql.includes('SELECT COUNT(*)')) {
+              return { rows: [{ cnt: 0 }] };
+            }
+            return { rowCount: 1, rows: [] };
+          },
+          release: () => {}
+        })
+      };
+
+      const successExitCode = await runWorkforceSeedCli(mockSuccessPool);
+      assert.strictEqual(successExitCode, 0, 'CLI must return exitCode 0 on success');
+    } finally {
+      process.exitCode = origExitCode;
+      process.env.NODE_ENV = origNodeEnv;
     }
   });
 });

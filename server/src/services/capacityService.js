@@ -129,12 +129,6 @@ export async function transferTicketAtomically({
   internalNotes = '',
   client: externalClient = null
 }) {
-  if (fromAgentId === toAgentId) {
-    const err = new Error('Transfer denied: target agent cannot be the same as transferring agent');
-    err.statusCode = 400;
-    throw err;
-  }
-
   const pool = getPool();
   const client = externalClient || await pool.connect();
   const shouldManageTransaction = !externalClient;
@@ -162,9 +156,26 @@ export async function transferTicketAtomically({
       err.statusCode = 400;
       throw err;
     }
-    if (ticket.assigned_agent_id !== fromAgentId) {
+
+    // Explicitly reject unassigned tickets
+    if (!ticket.assigned_agent_id) {
+      const err = new Error('Cannot transfer an unassigned ticket. Please claim or assign the ticket first.');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    // fromAgentId is derived exclusively from the ticket's database assignment under row lock
+    const authoritativeFromAgentId = ticket.assigned_agent_id;
+
+    if (fromAgentId && fromAgentId !== authoritativeFromAgentId) {
       const err = new Error('Transfer denied: ticket is not currently assigned to transferring agent');
       err.statusCode = 403;
+      throw err;
+    }
+
+    if (authoritativeFromAgentId === toAgentId) {
+      const err = new Error('Transfer denied: target agent cannot be the same as transferring agent');
+      err.statusCode = 400;
       throw err;
     }
 
@@ -181,11 +192,11 @@ export async function transferTicketAtomically({
         INSERT INTO ticket_routing_queue (
           id, brand_id, ticket_id, customer_id, priority, customer_language, required_skills, status, assigned_agent_id, assigned_at
         ) VALUES ($1, $2, $3, $4, 'High', 'en-US', ARRAY['general_inquiry'], 'assigned', $5, NOW())
-      `, [newQueueId, brandId, ticketId, ticket.customer_id || 'cust_unknown', fromAgentId]);
+      `, [newQueueId, brandId, ticketId, ticket.customer_id || 'cust_unknown', authoritativeFromAgentId]);
     }
 
     // Step 3: Lock both Agent profiles in alphabetical user_id order
-    const sortedUserIds = [fromAgentId, toAgentId].sort();
+    const sortedUserIds = [authoritativeFromAgentId, toAgentId].sort();
     const agentsRes = await client.query(`
       SELECT ap.user_id, ap.active_ticket_count, ap.max_concurrent_tickets, ap.configured_status, ap.last_heartbeat_at, bm.deactivated_at
       FROM agent_profiles ap
@@ -196,7 +207,7 @@ export async function transferTicketAtomically({
     `, [brandId, sortedUserIds[0], sortedUserIds[1]]);
 
     const agentMap = new Map(agentsRes.rows.map(a => [a.user_id, a]));
-    const sourceAgent = agentMap.get(fromAgentId);
+    const sourceAgent = agentMap.get(authoritativeFromAgentId);
     const targetAgent = agentMap.get(toAgentId);
 
     if (!sourceAgent || !targetAgent) {
@@ -242,26 +253,26 @@ export async function transferTicketAtomically({
         WHERE brand_id = $1
           AND assigned_agent_id = $2
           AND status IN ('Human Requested', 'Human Agent Active')
-      `, [brandId, fromAgentId]);
+      `, [brandId, authoritativeFromAgentId]);
 
       const trueCount = countRes.rows[0].true_count;
 
       decrRes = await client.query(`
         UPDATE agent_profiles SET active_ticket_count = $1, updated_at = NOW()
         WHERE brand_id = $2 AND user_id = $3
-      `, [trueCount, brandId, fromAgentId]);
+      `, [trueCount, brandId, authoritativeFromAgentId]);
 
       const historyId = `hist_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
       await client.query(`
         INSERT INTO agent_status_history (
           id, brand_id, user_id, previous_status, new_status, trigger_source, reason
         ) VALUES ($1, $2, $3, 'Active', 'Active', 'reconciliation', $4)
-      `, [historyId, brandId, fromAgentId, `Reconciled from ${sourceAgent.active_ticket_count} to ${trueCount} on transfer`]);
+      `, [historyId, brandId, authoritativeFromAgentId, `Reconciled from ${sourceAgent.active_ticket_count} to ${trueCount} on transfer`]);
     } else {
       decrRes = await client.query(`
         UPDATE agent_profiles SET active_ticket_count = active_ticket_count - 1, updated_at = NOW()
         WHERE brand_id = $1 AND user_id = $2
-      `, [brandId, fromAgentId]);
+      `, [brandId, authoritativeFromAgentId]);
     }
 
     const incrRes = await client.query(`
@@ -284,7 +295,7 @@ export async function transferTicketAtomically({
         attempted_resolutions, customer_commitments, pending_actions
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
     `, [
-      handoffId, brandId, ticketId, fromAgentId, toAgentId,
+      handoffId, brandId, ticketId, authoritativeFromAgentId, toAgentId,
       JSON.stringify(summaryObj),
       internalNotes || '',
       attemptedResolutions,
@@ -304,7 +315,7 @@ export async function transferTicketAtomically({
       dispatchSchedulingOpportunity(brandId);
     } catch (e) {}
 
-    return { success: true, ticketId, fromAgentId, toAgentId, handoffId };
+    return { success: true, ticketId, fromAgentId: authoritativeFromAgentId, toAgentId, handoffId };
   } catch (err) {
     if (shouldManageTransaction) await client.query('ROLLBACK');
     throw err;

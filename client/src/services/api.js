@@ -8,8 +8,8 @@ let inMemoryAgentToken = null;
 let inMemoryCsrfToken = null;
 
 export function setAgentAuthToken(token, csrfToken = null) {
-  inMemoryAgentToken = token;
-  if (csrfToken) inMemoryCsrfToken = csrfToken;
+  inMemoryAgentToken = token || null;
+  inMemoryCsrfToken = csrfToken || null;
   if (typeof window !== 'undefined' && window.sessionStorage) {
     if (token) window.sessionStorage.setItem('resolve_agent_token', token);
     else window.sessionStorage.removeItem('resolve_agent_token');
@@ -110,6 +110,34 @@ export const submitResolutionFeedback = (id, feedback) =>
     method: 'POST',
     body: JSON.stringify(feedback),
   });
+
+// Agent Authentication API
+export const loginAgent = ({ email, password, brandId = 'brand_novacart' }) =>
+  fetchAPI('/api/auth/agent/login', {
+    method: 'POST',
+    body: JSON.stringify({ email, password, brandId }),
+  }).then(res => {
+    if (res?.sessionToken) {
+      setAgentAuthToken(res.sessionToken, res.csrfToken);
+      if (res.agent?.id && typeof window !== 'undefined' && window.sessionStorage) {
+        window.sessionStorage.setItem('resolve_active_agent_id', res.agent.id);
+      }
+    }
+    return res;
+  });
+
+export const logoutAgent = () =>
+  fetchAPI('/api/auth/agent/logout', {
+    method: 'POST',
+  }).then(res => {
+    setAgentAuthToken(null, null);
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      window.sessionStorage.removeItem('resolve_active_agent_id');
+    }
+    return res;
+  });
+
+export const getCurrentAgent = () => fetchAPI('/api/auth/agent/me');
 
 // Agent Sessions & Availability API
 export const createAgentSession = (userId = 'user_sarah_lin', brandId = 'brand_novacart') =>

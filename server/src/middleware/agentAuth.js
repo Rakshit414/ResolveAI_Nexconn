@@ -6,14 +6,14 @@ import { query } from '../db/pool.js';
  * Enforces session validity, membership deactivation checks, and CSRF protection on state mutations.
  */
 export async function requireAgentAuth(req, res, next) {
-  // Extract token from Cookie or Bearer header
+  // Extract token from Bearer header first (explicit client token takes precedence), then fallback to Cookie
   let rawToken = null;
-  if (req.headers.cookie) {
+  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+    rawToken = req.headers.authorization.slice(7).trim();
+  }
+  if (!rawToken && req.headers.cookie) {
     const match = req.headers.cookie.match(/resolve_agent_session=([^;]+)/);
     if (match) rawToken = match[1];
-  }
-  if (!rawToken && req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
-    rawToken = req.headers.authorization.slice(7).trim();
   }
 
   // Reject customer widget tokens

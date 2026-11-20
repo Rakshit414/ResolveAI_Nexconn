@@ -28,6 +28,7 @@ export default function ChatWindow({
   onClaimTicket = null,
   agentRoster = [],
   currentAgentId = 'user_sarah_lin',
+  currentAgentName = 'Sarah Lin',
   isCopilotOpen,
   onToggleCopilot,
   isSplitView = false,
@@ -268,6 +269,16 @@ export default function ChatWindow({
   const isAgentActive = currentStatus === 'Human Agent Active';
   const isResolved = currentStatus === 'Resolved';
 
+  if (!ticket) {
+    return (
+      <div className="flex-1 h-full flex flex-col items-center justify-center bg-[#090909] text-[#8A8A8A] p-6 text-center">
+        <Inbox className="w-12 h-12 text-[#333333] mb-3" />
+        <h3 className="text-sm font-semibold text-[#FFFFFF] mb-1">No ticket selected</h3>
+        <p className="text-xs text-[#666666] max-w-sm">Select a ticket from the inbox to view customer conversation history and send replies.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="flex-1 h-full min-w-0 flex flex-col bg-[#090909] overflow-hidden relative">
       {/* Workspace Header: Clean, Uncluttered, Single Row */}
@@ -470,7 +481,7 @@ export default function ChatWindow({
       {/* Messages Stream - Generous readable spacing with natural line length and 15px typography */}
       <div className="flex-1 overflow-y-auto px-6 md:px-8 py-6 space-y-6 bg-[#090909]">
         {messages.map((msg) => {
-          const isAgent = msg.senderRole === 'agent' || msg.senderId === 'agent_sarah';
+          const isAgent = msg.senderRole === 'agent' || msg.senderId === 'agent_sarah' || msg.senderId?.startsWith('user_');
           const isSystem = msg.senderRole === 'system';
           const att = msg.attachment || msg.metadata?.attachment;
           const msgLang = msg.metadata?.language;
@@ -543,7 +554,7 @@ export default function ChatWindow({
               {/* Message Meta Info */}
               <div className="flex items-center space-x-2 mb-1.5 px-1 text-xs text-[#8A8A8A]">
                 <span className={`font-semibold ${isAgent ? 'text-[#7CFF00]' : 'text-[#FFFFFF]'}`}>
-                  {isAgent ? 'Sarah Lin' : customer?.name}
+                  {isAgent ? (msg.senderName || currentAgentName || 'Agent') : customer?.name}
                 </span>
                 <span>·</span>
                 <span className="font-mono text-[11px]">
@@ -697,8 +708,8 @@ export default function ChatWindow({
           onChange={(e) => setInputText(e.target.value)}
           placeholder={
             isInternalNote
-              ? 'Add a private note for the team (customer cannot see this)...'
-              : `Reply to ${customer?.name || 'customer'}...`
+              ? `Add a private note for the team (author: ${currentAgentName})...`
+              : `Reply as ${currentAgentName} to ${customer?.name || 'customer'}...`
           }
           disabled={isSending}
           className={`flex-1 bg-[#141414] rounded-xl px-4 py-2.5 text-sm text-[#FFFFFF] placeholder-[#666666] focus:outline-none transition-colors disabled:opacity-50 border ${

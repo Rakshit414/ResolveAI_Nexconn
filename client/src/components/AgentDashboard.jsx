@@ -5,6 +5,8 @@ import {
   getTicket,
   takeOverTicket,
   resolveTicket,
+  loginAgent,
+  logoutAgent,
   createAgentSession,
   refreshAgentHeartbeat,
   getAgentProfile,
@@ -15,7 +17,8 @@ import {
   getAgentRoster,
   claimOrReassignTicket,
   transferTicket,
-  resolveTicketWithCapacity
+  resolveTicketWithCapacity,
+  sendAgentReply
 } from '../services/api';
 import nexconnService from '../services/nexconnService';
 import ConversationInbox from './ConversationInbox';
@@ -91,34 +94,82 @@ export default function AgentDashboard({
     return 'Available';
   };
 
-  // Dynamic agent identity switch handler
-  const handleSwitchAgent = async (agent) => {
-    setCurrentAgent(agent);
-    setAgentRole(agent.role);
+  // Agent Authentication & Switching State for Individually Entered Credentials
+  const [pendingAgentSwitch, setPendingAgentSwitch] = useState(null);
+  const [agentAuthPassword, setAgentAuthPassword] = useState('');
+  const [agentAuthError, setAgentAuthError] = useState(null);
+  const [isAgentAuthenticating, setIsAgentAuthenticating] = useState(false);
+
+  // Dynamic agent identity selection handler - prompts for credentials
+  const handleSelectAgentForSwitch = (agent) => {
     setAgentDropdownOpen(false);
+    if (agent.id === currentAgent.id) return;
+    setPendingAgentSwitch(agent);
+    setAgentAuthPassword('');
+    setAgentAuthError(null);
+  };
+
+  // Confirm agent switch with individually entered password
+  const handleConfirmAgentSwitch = async (e) => {
+    if (e) e.preventDefault();
+    if (!pendingAgentSwitch || !agentAuthPassword.trim()) {
+      setAgentAuthError('Password is required');
+      return;
+    }
+
+    setIsAgentAuthenticating(true);
+    setAgentAuthError(null);
+
     try {
-      const sessionRes = await createAgentSession(agent.id, 'brand_novacart');
-      if (sessionRes?.profile) {
-        const prof = sessionRes.profile;
-        setConfiguredStatus(prof.configuredStatus || 'Available');
-        setMaxCapacity(prof.maxConcurrentTickets || 3);
-        setActiveWorkload(prof.activeTicketCount || 0);
-        setAgentRole(prof.role || agent.role);
-        setEffectiveStatus(calculateEffectiveStatus(
-          prof.configuredStatus || 'Available',
-          prof.activeTicketCount || 0,
-          prof.maxConcurrentTickets || 3
-        ));
+      if (heartbeatTimerRef.current) clearInterval(heartbeatTimerRef.current);
+
+      // 1. Authenticate with real individually entered credentials
+      const loginRes = await loginAgent({
+        email: pendingAgentSwitch.email,
+        password: agentAuthPassword.trim(),
+        brandId: 'brand_novacart'
+      });
+
+      if (!loginRes?.sessionToken) {
+        throw new Error(loginRes?.error || 'Authentication failed');
       }
+
+      // 2. Set active agent state
+      setCurrentAgent(pendingAgentSwitch);
+      setAgentRole(pendingAgentSwitch.role);
+
+      // 3. Immediately heartbeat and set status to Available
+      await refreshAgentHeartbeat().catch(() => {});
+      await updateAgentStatus('Available').catch(() => {});
+      setConfiguredStatus('Available');
+
+      // 4. Keep heartbeat active for the newly authenticated agent
+      heartbeatTimerRef.current = setInterval(() => {
+        refreshAgentHeartbeat().catch(() => {});
+      }, 20000);
+
+      // 5. Connect Nexconn identity
       nexconnService.connectUser({
-        id: agent.id,
-        name: agent.name,
-        avatar: agent.avatar,
+        id: pendingAgentSwitch.id,
+        name: pendingAgentSwitch.name,
+        avatar: pendingAgentSwitch.avatar,
         role: 'agent',
       });
-      refreshData();
+
+      setNoticeMessage(`Switched active agent identity to ${pendingAgentSwitch.name} (${pendingAgentSwitch.roleLabel}).`);
+      setTimeout(() => setNoticeMessage(null), 3000);
+
+      // 6. Clean up modal
+      setPendingAgentSwitch(null);
+      setAgentAuthPassword('');
+
+      // 7. Refresh tickets, roster, and overview for the newly authenticated agent
+      await refreshData();
     } catch (e) {
-      console.warn('[handleSwitchAgent notice]:', e.message);
+      console.warn('[handleConfirmAgentSwitch error]:', e.message);
+      setAgentAuthError(e.message || 'Authentication failed. Please verify credentials.');
+    } finally {
+      setIsAgentAuthenticating(false);
     }
   };
 
@@ -128,18 +179,19 @@ export default function AgentDashboard({
 
     async function initAgentSession() {
       try {
-        const sessionRes = await createAgentSession(currentAgent.id, 'brand_novacart');
-        if (isMounted && sessionRes?.profile) {
-          const prof = sessionRes.profile;
-          setConfiguredStatus(prof.configuredStatus || 'Available');
-          setMaxCapacity(prof.maxConcurrentTickets || 3);
-          setActiveWorkload(prof.activeTicketCount || 0);
-          setAgentRole(prof.role || currentAgent.role);
-          setEffectiveStatus(calculateEffectiveStatus(
-            prof.configuredStatus || 'Available',
-            prof.activeTicketCount || 0,
-            prof.maxConcurrentTickets || 3
-          ));
+        // Check if an existing authenticated agent session is active
+        const profileRes = await getAgentProfile().catch(() => null);
+        if (profileRes?.profile) {
+          await refreshAgentHeartbeat().catch(() => {});
+          const matchingAgent = DEMO_AGENTS_LIST.find(a => a.id === (profileRes.profile.user_id || profileRes.profile.userId));
+          if (matchingAgent && isMounted) {
+            setCurrentAgent(matchingAgent);
+            setAgentRole(matchingAgent.role);
+          }
+        }
+
+        if (isMounted) {
+          await refreshData().catch(() => {});
         }
       } catch (err) {
         console.warn('[AgentDashboard session note]:', err.message);
@@ -157,12 +209,13 @@ export default function AgentDashboard({
       isMounted = false;
       if (heartbeatTimerRef.current) clearInterval(heartbeatTimerRef.current);
     };
-  }, [currentAgent.id]);
+  }, []);
 
   // 2. Fetch Remote Tickets, Roster & Unassigned Queue
   const refreshData = useCallback(async () => {
     try {
-      const [rosterRes, unassignedRes, overviewRes] = await Promise.allSettled([
+      const [myTicketsRes, rosterRes, unassignedRes, overviewRes] = await Promise.allSettled([
+        getMyTickets(),
         getAgentRoster(),
         getUnassignedTickets(),
         getTeamOverview()
@@ -180,6 +233,47 @@ export default function AgentDashboard({
         }
       }
 
+      if (myTicketsRes.status === 'fulfilled' && Array.isArray(myTicketsRes.value?.tickets)) {
+        const remoteTickets = myTicketsRes.value.tickets.map(rt => {
+          const demoCust = DEMO_CUSTOMERS.find(c => c.ticket.id === rt.id || c.order?.orderId === rt.id || c.id === rt.customerId);
+          return {
+            id: rt.id,
+            orderId: demoCust?.order?.orderId || rt.id.replace('tkt_', 'NC'),
+            channelId: demoCust?.channelId || `channel_${rt.id}`,
+            category: rt.category || demoCust?.ticket.category || 'Support',
+            priority: rt.priority || 'Medium',
+            status: rt.status,
+            humanRequested: Boolean(rt.humanRequested),
+            summary: rt.summary || demoCust?.ticket.summary,
+            lastUpdated: rt.lastUpdated || rt.last_updated || new Date().toISOString(),
+            assignedAgentId: rt.assignedAgentId || rt.assigned_agent_id || currentAgent.id,
+            customer: demoCust ? {
+              id: demoCust.id,
+              name: rt.customerName || rt.customer_name || demoCust.name,
+              email: rt.customerEmail || rt.customer_email || demoCust.email,
+              avatar: demoCust.avatar,
+              order: demoCust.order,
+              channelId: demoCust.channelId
+            } : {
+              id: rt.customerId || rt.customer_id,
+              name: rt.customerName || rt.customer_name || 'Customer',
+              email: rt.customerEmail || rt.customer_email || '',
+              avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
+              order: { orderId: rt.id.replace('tkt_', 'NC') }
+            }
+          };
+        });
+
+        setTickets(remoteTickets);
+
+        // Synchronize selectedTicket with updated tickets
+        setSelectedTicket(prev => {
+          if (!prev) return remoteTickets[0] || null;
+          const match = remoteTickets.find(t => t.id === prev.id);
+          return match || remoteTickets[0] || null;
+        });
+      }
+
       if (unassignedRes.status === 'fulfilled' && unassignedRes.value?.tickets) {
         setUnassignedTickets(unassignedRes.value.tickets);
       }
@@ -190,7 +284,7 @@ export default function AgentDashboard({
     } catch (e) {
       // Non-fatal fallback
     }
-  }, [currentAgent.id]);
+  }, [currentAgent.id, currentAgent.role]);
 
   // 3. Initialize tickets and Nexconn listeners
   useEffect(() => {
@@ -415,36 +509,45 @@ export default function AgentDashboard({
 
   // Ticket Transfer Handler
   const handleTransferTicket = async (ticketId, transferData) => {
-    const res = await transferTicket(ticketId, transferData);
-    if (res?.success) {
-      setNoticeMessage('Ticket transferred successfully.');
-      setTimeout(() => setNoticeMessage(null), 3000);
+    try {
+      const res = await transferTicket(ticketId, transferData);
+      if (res?.success) {
+        const targetAgent = agentRoster.find(a => a.userId === transferData.toAgentId);
+        const targetName = targetAgent?.displayName || targetAgent?.name || transferData.toAgentId;
+        setNoticeMessage(`Ticket transferred successfully to ${targetName}.`);
+        setTimeout(() => setNoticeMessage(null), 3000);
 
-      // Add handoff note locally to conversation history
-      const channelId = selectedTicket?.channelId || `channel_${selectedTicket?.orderId}`;
-      const transferNote = {
-        id: `note_transfer_${Date.now()}`,
-        senderName: currentAgent.name,
-        senderRole: 'internal_note',
-        isInternal: true,
-        text: `Transferred ticket to agent ${transferData.toAgentId}. Handoff context: ${transferData.handoffSummaryJson?.reason || 'Reassigned'}. Notes: ${transferData.internalNotes || 'None'}`,
-        timestamp: new Date().toISOString(),
-        metadata: {
-          type: 'TRANSFER_HANDOFF',
+        // Add handoff note locally to conversation history
+        const channelId = selectedTicket?.channelId || `channel_${selectedTicket?.orderId}`;
+        const transferNote = {
+          id: `note_transfer_${Date.now()}`,
+          senderName: currentAgent.name,
+          senderRole: 'internal_note',
           isInternal: true,
-          handoffSummary: transferData.handoffSummaryJson
-        }
-      };
+          text: `Transferred ticket to agent ${targetName}. Handoff context: ${transferData.handoffSummaryJson?.reason || 'Reassigned'}. Notes: ${transferData.internalNotes || 'None'}`,
+          timestamp: new Date().toISOString(),
+          metadata: {
+            type: 'TRANSFER_HANDOFF',
+            isInternal: true,
+            handoffSummary: transferData.handoffSummaryJson
+          }
+        };
 
-      setMessagesMap(prev => ({
-        ...prev,
-        [ticketId]: [...(prev[ticketId] || []), transferNote]
-      }));
+        setMessagesMap(prev => ({
+          ...prev,
+          [ticketId]: [...(prev[ticketId] || []), transferNote]
+        }));
 
-      refreshData();
-      return res;
+        await refreshData();
+        return res;
+      }
+      throw new Error(res?.error || 'Transfer failed');
+    } catch (err) {
+      console.error('Transfer failed:', err);
+      setNoticeMessage(`Transfer failed: ${err.message}`);
+      setTimeout(() => setNoticeMessage(null), 4000);
+      throw err;
     }
-    throw new Error(res?.error || 'Transfer failed');
   };
 
   // Ticket Resolution Handler with capacity release
@@ -494,9 +597,9 @@ export default function AgentDashboard({
       const channelId = selectedTicket.channelId || `channel_${selectedTicket.orderId}`;
       const targetUserId = selectedTicket.customer?.id;
       const noticeText = newStatus === 'Human Agent Active'
-        ? `Sarah Lin (Support Specialist) has joined the conversation and taken over order #${selectedTicket.orderId}.`
+        ? `${currentAgent.name} (${currentAgent.role === 'team_lead' ? 'Team Lead' : 'Support Specialist'}) has joined the conversation and taken over order #${selectedTicket.orderId}.`
         : newStatus === 'Resolved'
-        ? `Ticket for order #${selectedTicket.orderId} marked as resolved by Sarah Lin. Thank you for contacting NovaCart Support!`
+        ? `Ticket for order #${selectedTicket.orderId} marked as resolved by ${currentAgent.name}. Thank you for contacting NovaCart Support!`
         : `Ticket status for order #${selectedTicket.orderId} updated to: ${newStatus}`;
 
       await nexconnService.sendMessage({
@@ -531,7 +634,7 @@ export default function AgentDashboard({
       // Internal Note: Never sent to customer over Nexconn
       const internalMsg = {
         id: `note_${Date.now()}`,
-        senderName: 'Sarah Lin',
+        senderName: currentAgent.name,
         senderRole: 'internal_note',
         isInternal: true,
         text,
@@ -539,7 +642,9 @@ export default function AgentDashboard({
         metadata: {
           type: 'INTERNAL_NOTE',
           isInternal: true,
-          ticketId: selectedTicket.id
+          ticketId: selectedTicket.id,
+          authorAgentId: currentAgent.id,
+          authorAgentName: currentAgent.name
         }
       };
 
@@ -554,6 +659,15 @@ export default function AgentDashboard({
 
     // Customer-facing message
     try {
+      // 1. Authenticated backend reply endpoint
+      let backendReply = null;
+      try {
+        backendReply = await sendAgentReply(selectedTicket.id, text);
+      } catch (backendErr) {
+        console.warn('Backend reply endpoint warning (falling back to local relay):', backendErr);
+      }
+
+      // 2. Broadcast via Nexconn service for customer widget
       const sentMsg = await nexconnService.sendMessage({
         targetUserId,
         channelId,
@@ -561,18 +675,33 @@ export default function AgentDashboard({
         metadata: {
           orderId: selectedTicket.orderId,
           ticketId: selectedTicket.id,
+          authorAgentId: currentAgent.id,
+          authorAgentName: currentAgent.name,
         },
       });
 
-      if (sentMsg) {
-        setMessagesMap((prev) => ({
-          ...prev,
-          [selectedTicket.id]: nexconnService.getChannelMessages(channelId),
-        }));
-
-        if (selectedTicket.status !== 'Human Agent Active' && selectedTicket.status !== 'Resolved') {
-          await handleUpdateStatus('Human Agent Active');
+      const newMsg = {
+        id: backendReply?.messageId || sentMsg?.id || `msg_${Date.now()}`,
+        senderName: currentAgent.name,
+        senderId: currentAgent.id,
+        senderRole: 'agent',
+        text,
+        timestamp: new Date().toISOString(),
+        metadata: {
+          orderId: selectedTicket.orderId,
+          ticketId: selectedTicket.id,
+          authorAgentId: currentAgent.id,
+          authorAgentName: currentAgent.name,
         }
+      };
+
+      setMessagesMap((prev) => ({
+        ...prev,
+        [selectedTicket.id]: [...(prev[selectedTicket.id] || []), newMsg],
+      }));
+
+      if (selectedTicket.status !== 'Human Agent Active' && selectedTicket.status !== 'Resolved') {
+        await handleUpdateStatus('Human Agent Active');
       }
     } catch (err) {
       console.error('Failed to send agent reply:', err);
@@ -654,7 +783,7 @@ export default function AgentDashboard({
                     <button
                       key={ag.id}
                       id={`btn-switch-agent-${ag.id}`}
-                      onClick={() => handleSwitchAgent(ag)}
+                      onClick={() => handleSelectAgentForSwitch(ag)}
                       className={`w-full flex items-center justify-between px-3 py-2 text-left transition-colors ${
                         isSelected
                           ? 'bg-[#7CFF00]/10 text-[#7CFF00] font-bold'
@@ -890,6 +1019,7 @@ export default function AgentDashboard({
               onClaimTicket={handleClaimTicket}
               agentRoster={agentRoster}
               currentAgentId={currentAgent.id}
+              currentAgentName={currentAgent.name}
               currentUserRole={agentRole}
               isCopilotOpen={isSplitView ? splitPanel === 'copilot' : isCopilotStandaloneOpen}
               onToggleCopilot={() => {
@@ -946,6 +1076,91 @@ export default function AgentDashboard({
             setTimeout(() => setNoticeMessage(null), 3000);
           }}
         />
+
+        {/* Agent Authentication Modal for Individually Entered Credentials */}
+        {pendingAgentSwitch && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn">
+            <div className="bg-[#121212] border border-[#262626] rounded-2xl w-full max-w-sm p-6 shadow-2xl">
+              <div className="flex items-center space-x-3 mb-4">
+                <img
+                  src={pendingAgentSwitch.avatar}
+                  alt={pendingAgentSwitch.name}
+                  className="w-10 h-10 rounded-full object-cover ring-2 ring-[#7CFF00]/40"
+                />
+                <div>
+                  <h3 className="text-sm font-bold text-white">Authenticate Agent</h3>
+                  <p className="text-xs text-[#8A8A8A]">{pendingAgentSwitch.name} &bull; {pendingAgentSwitch.roleLabel}</p>
+                </div>
+              </div>
+
+              <form onSubmit={handleConfirmAgentSwitch} className="space-y-4">
+                <div>
+                  <label className="block text-[11px] font-medium text-[#AAAAAA] mb-1">
+                    Agent Email
+                  </label>
+                  <input
+                    type="text"
+                    readOnly
+                    value={pendingAgentSwitch.email}
+                    className="w-full bg-[#1A1A1A] border border-[#2E2E2E] rounded-lg px-3 py-2 text-xs text-[#888888] cursor-not-allowed"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-medium text-[#AAAAAA] mb-1">
+                    Password <span className="text-[#EF4444]">*</span>
+                  </label>
+                  <input
+                    id="agent-auth-password-input"
+                    type="password"
+                    autoFocus
+                    required
+                    value={agentAuthPassword}
+                    onChange={(e) => setAgentAuthPassword(e.target.value)}
+                    placeholder="Enter agent password"
+                    className="w-full bg-[#141414] border border-[#333333] focus:border-[#7CFF00] rounded-lg px-3 py-2 text-xs text-white outline-none transition-colors"
+                  />
+                </div>
+
+                {agentAuthError && (
+                  <div className="text-xs text-[#EF4444] bg-[#EF4444]/10 border border-[#EF4444]/20 rounded-lg p-2.5 flex items-center space-x-2">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{agentAuthError}</span>
+                  </div>
+                )}
+
+                <div className="flex space-x-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPendingAgentSwitch(null);
+                      setAgentAuthPassword('');
+                      setAgentAuthError(null);
+                    }}
+                    className="flex-1 px-4 py-2 rounded-lg bg-[#1A1A1A] hover:bg-[#222222] text-[#AAAAAA] hover:text-white text-xs font-semibold transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    id="btn-confirm-agent-auth"
+                    type="submit"
+                    disabled={isAgentAuthenticating || !agentAuthPassword}
+                    className="flex-1 px-4 py-2 rounded-lg bg-[#7CFF00] hover:bg-[#6BE000] disabled:bg-[#333333] disabled:text-[#666666] text-black text-xs font-bold transition-colors flex items-center justify-center space-x-1.5"
+                  >
+                    {isAgentAuthenticating ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Authenticating...</span>
+                      </>
+                    ) : (
+                      <span>Authenticate & Switch</span>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

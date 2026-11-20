@@ -1,5 +1,6 @@
 // server/src/routes/inbox.js
 import express from 'express';
+import { query } from '../db/pool.js';
 import { requireAgentAuth } from '../middleware/agentAuth.js';
 import {
   getUnassignedTickets,
@@ -172,11 +173,32 @@ router.post('/tickets/:ticketId/transfer', requireAgentAuth, async (req, res) =>
     return res.status(400).json({ error: 'Transfer reason is required' });
   }
 
-  // Authorization: normal agents can only transfer tickets assigned to them
-  const fromAgentId = req.body.fromAgentId || req.agent.id;
-  if (fromAgentId !== req.agent.id && !['support_lead', 'admin'].includes(req.agent.role)) {
+  // Look up ticket to verify current assignment and permissions
+  const ticketRes = await query(`
+    SELECT id, brand_id, assigned_agent_id, status
+    FROM tickets
+    WHERE brand_id = $1 AND id = $2
+  `, [req.agent.brandId, ticketId]);
+
+  if (ticketRes.rows.length === 0) {
+    return res.status(404).json({ error: 'Ticket not found' });
+  }
+
+  const currentTicket = ticketRes.rows[0];
+
+  // Handle unassigned tickets explicitly
+  if (!currentTicket.assigned_agent_id) {
+    return res.status(400).json({ error: 'Cannot transfer an unassigned ticket. Please claim or assign the ticket first.' });
+  }
+
+  // Authorization: normal agents can only transfer tickets assigned to them; support leads and admins can transfer any assigned ticket
+  const isLeadOrAdmin = ['support_lead', 'admin'].includes(req.agent.role);
+  if (!isLeadOrAdmin && currentTicket.assigned_agent_id !== req.agent.id) {
     return res.status(403).json({ error: 'Unauthorized to transfer tickets assigned to other agents' });
   }
+
+  // fromAgentId is derived exclusively from the ticket's database assignment, never trusting req.body
+  const fromAgentId = currentTicket.assigned_agent_id;
 
   try {
     const result = await transferTicket({

@@ -100,21 +100,33 @@ export async function processNextOutboxJob() {
         [dispatchRes.messageId, job.id]
       );
 
-      // Append to message_archive
+      // Resolve author agent identity from job metadata
+      const meta = typeof job.metadata === 'string' ? JSON.parse(job.metadata || '{}') : (job.metadata || {});
+      const authorAgentId = meta.authorAgentId;
+      let authorName = 'Support Agent';
+      if (authorAgentId) {
+        const userRes = await query(`SELECT name FROM users WHERE id = $1`, [authorAgentId]);
+        if (userRes.rows.length > 0) {
+          authorName = userRes.rows[0].name;
+        }
+      }
+
+      // Append to message_archive with internal author identity preserved
       await query(
         `INSERT INTO message_archive (
            id, brand_id, ticket_id, nexconn_message_id, sender_user_id, target_user_id,
            sender_role, sender_name, message_type, message_text, content_payload
          )
-         VALUES ($1, $2, $3, $4, $5, $6, 'agent', 'Support Agent', $7, $8, $9)
+         VALUES ($1, $2, $3, $4, $5, $6, 'agent', $7, $8, $9, $10)
          ON CONFLICT (nexconn_message_id) DO NOTHING`,
         [
           `arch_${job.id}`,
           job.brand_id,
           job.ticket_id,
           dispatchRes.messageId,
-          job.sender_user_id,
+          authorAgentId || job.sender_user_id,
           job.target_user_id,
+          authorName,
           job.message_type,
           job.message_text,
           JSON.stringify({ content: job.message_text, extra: correlationData })

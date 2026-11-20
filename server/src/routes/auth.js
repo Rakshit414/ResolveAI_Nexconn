@@ -105,7 +105,10 @@ router.post('/agent/login', async (req, res) => {
  */
 router.post('/agent/logout', async (req, res) => {
   let rawToken = null;
-  if (req.headers.cookie) {
+  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+    rawToken = req.headers.authorization.slice(7).trim();
+  }
+  if (!rawToken && req.headers.cookie) {
     const match = req.headers.cookie.match(/resolve_agent_session=([^;]+)/);
     if (match) rawToken = match[1];
   }

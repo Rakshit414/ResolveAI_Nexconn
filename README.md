@@ -1,228 +1,184 @@
-# Resolve AI — Intelligent Customer Support Workspace
+# Resolve AI — Enterprise Multi-Agent Customer Support & Global Localization Platform
 
-> **From customer confusion to resolution, in one conversation.**  
-> *Built for the Nexconn Build Challenge — Marketplace & Support Track*  
-> **Brand Palette:** Jet Black (`#090909`), Pure White (`#FFFFFF`), Neon Fluorescent Lime Green (`#7CFF00`)
+Resolve AI is an omnichannel customer support and real-time conversation platform built on top of the **Nexconn Chat SDK** and **Gemini AI** for enterprise e-commerce merchants.
 
----
-
-> [!WARNING]
-> ### 🚨 30-Day Cloud Database Expiry & Permanent Migration Notice
-> **Temporary Environment:** Render Free Managed PostgreSQL (`resolve-ai-db`, Singapore `singapore`)  
-> **Database Creation Timestamp:** `2026-11-10T18:52:00+05:30`  
-> **Render Hard Deletion Timestamp:** **`2026-12-10T18:52:00+05:30`** (Day 30 auto-termination)  
-> **Emergency Cutoff Deadline:** **`2026-12-05T18:52:00+05:30`** (Day 25 zero-traffic transition)  
-> **Mandatory Review Checkpoint:** **`2026-11-30T18:52:00+05:30`** (Day 20 off-site export & test restore)  
-> **Permanent Target Host:** Oracle Cloud Always Free (Home Region: India West - Mumbai / `ap-mumbai-1`)  
-> **Migration Runbook:** Follow [`docs/ORACLE_CLOUD_MIGRATION_GUIDE.md`](docs/ORACLE_CLOUD_MIGRATION_GUIDE.md) for full-stack migration procedures.
+The platform links an interactive consumer storefront (NovaCart) with a multi-tier human agent workforce, providing live bidirectional messaging, automatic ticket assignment, capacity-managed handoffs, and 12-language real-time translation with native Arabic RTL support.
 
 ---
 
-## 🌟 Overview
-
-**Resolve AI** is an intelligent, full-stack customer support workspace engineered to solve modern retail & marketplace support bottlenecks:
-- Customers experience delayed responses and lack of real-time transparency.
-- Support agents lack immediate context and cross-system policy references.
-- Escalations between AI bots and human agents are clumsy and context-losing.
-- Small support teams need automated drafting without risking hallucinations.
-
-Resolve AI combines **genuine Nexconn Chat SDK DirectChannel real-time messaging** with **Gemini AI Copilot intelligence** (with automated multi-model failover) to deliver end-to-end resolution in one unified, high-performance workspace.
-
----
-
-## 🏗️ Architecture
+## System Architecture
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
-│                        Resolve AI Client (SPA)                         │
-│            React 18 + Vite + Tailwind CSS + Lucide Icons               │
-├──────────────────────────┬─────────────────────────────────────────────┤
-│     Customer Portal      │           Support Agent Dashboard           │
-│        (/customer)       │                   (/agent)                  │
-│  - Multi-Customer Switch │   - Multi-Channel Priority Inbox            │
-│  - Real-Time Chat Stream │   - Active Conversation Workspace           │
-│  - "Request Human" Button│   - AI Copilot Panel (Approval Gate)        │
-│  - Order Tracking Drawer │   - NovaCart Policy Citations               │
-│  - Live Status Banner    │   - Takeover & Resolution Actions           │
-└────────────┬─────────────┴──────────────────────┬──────────────────────┘
-             │                                    │
-             │       Nexconn Direct Channels      │
-             └──────────────────┬─────────────────┘
-                                ▼
-         ┌──────────────────────────────────────────────┐
-         │          Nexconn Real-Time Network           │
-         │     (@nexconn/engine & @nexconn/chat)        │
-         │  - Live 1:1 DirectChannel WebSocket Engine   │
-         │  - Isolated Order-Scoped Channels            │
-         │  - In-Flight Double-Submission Protection    │
-         └──────────────────────┬───────────────────────┘
-                                │
-               ┌────────────────┴────────────────┐
-               ▼                                 ▼
-┌─────────────────────────────┐   ┌─────────────────────────────┐
-│    Resolve AI Backend API   │   │      Gemini AI Copilot      │
-│     (Node.js + Express)     │   │     (@google/generative-ai) │
-│ - Token Minting (HMAC SHA1) │   │ - Real-Time Classification  │
-│ - Atomic Disk Persistence   │   │ - Structured 4-Part Summary │
-│   (server/data/tickets.json)│   │ - Policy-Enforced Suggestions│
-│ - Input Whitelist Validation│   │ - Multi-Model Failover      │
-│ - Protected Demo Reset      │   │   (flash -> flash-lite)     │
-└─────────────────────────────┘   └─────────────────────────────┘
+│                      NovaCart E-Commerce Frontends                     │
+│  - Consumer Storefront & Shopping Cart (/store)                        │
+│  - Customer Support Portal (/customer)                                 │
+│  - Floating Embeddable Support Widget (Iframe Isolated)                │
+└──────────────────────────┬─────────────────────────────────────────────┘
+                           │
+                           ▼
+          Nexconn Real-Time Gateway (@nexconn/chat)
+          - 1:1 DirectChannel Messaging
+          - Connection Status Monitoring
+          - Automatic Transcript Hydration
+                           │
+                           ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                   Resolve AI Multi-Agent Cockpit                       │
+│  - Collaborative Shared Inbox (/agent)                                 │
+│  - Role-Based Agent Personas (Sarah Lin, Carlos Gomez, Elena Rodriguez)│
+│  - Dynamic Availability & Capacity Accounting                          │
+│  - AI Copilot Assistance & Grounded Policy Citations                   │
+└──────────────────────────┬─────────────────────────────────────────────┘
+                           │
+                           ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                   Backend & Data Safety Services                       │
+│  - Node.js & Express REST Endpoints                                    │
+│  - Transactional Outbox Worker with Signed Dispatch                    │
+│  - PostgreSQL 16 ACID Storage (Row-level Locking)                      │
+│  - Zero-Leak Customer PII Masking on Unassigned Queues                 │
+└────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 🚀 Quick Start Instructions (Windows PowerShell & CMD)
+## Core Capabilities
+
+### 1. Real-Time Nexconn Chat Integration
+- **Direct Channels**: Secure 1:1 conversation channels between customer identities and registered merchant support endpoints (`novacart_support`).
+- **Event-Driven Messaging**: Sub-100ms latency via `SendTextMessageParams` and `MessageHandler`.
+- **Signed Dispatch Engine**: Outbox service issues server-to-server HTTP dispatches with SHA-1 signatures (`AppSecret + Nonce + Timestamp`) to guarantee delivery.
+
+### 2. Multi-Agent Collaborative Workforce
+- **Authenticated Personas**: Support Lead (Sarah Lin) and Support Specialists (Carlos Gomez, Elena Rodriguez).
+- **Atomic Handoffs**: Tickets transfer with row locks (`SELECT ... FOR UPDATE`), preserving audit notes while reallocating workload capacity in real time.
+- **Shared Inboxes**: Real-time filtering across active assignments, unassigned queues, and resolved tickets.
+
+### 3. 12-Language Localization Engine
+- **Supported Languages**: English, Hindi, Marathi, Bengali, Tamil, Telugu, Gujarati, Kannada, Malayalam, Punjabi, Arabic, and Simplified Chinese.
+- **Bidirectional UI Support**: Full right-to-left layout rendering for Arabic and clean rendering for Asian scripts.
+- **Fail-Safe Translation**: Circuit breaker mechanism prevents service degradation during upstream network issues.
+
+### 4. AI Copilot & Grounded Policy Hub
+- **Contextual Draft Generation**: Gemini-powered recommendations based on active ticket context and customer sentiment.
+- **Human Approval Gate**: Support specialists review, edit, or approve AI-generated suggestions before dispatch.
+- **Policy Enforcement**: Automatic citations for shipping, returns, and refund thresholds.
+
+---
+
+## Tech Stack
+
+| Layer | Technologies |
+| :--- | :--- |
+| **Messaging** | Nexconn Chat SDK (`@nexconn/chat`, `@nexconn/engine`) |
+| **Frontend** | React 18, Vite, Tailwind CSS, Lucide Icons |
+| **Backend** | Node.js, Express, Axios, BCrypt |
+| **Database** | PostgreSQL 16 (Native & Render Managed) |
+| **AI / LLM** | Google Gemini API (`@google/generative-ai`) |
+| **Testing** | Node.js Native Test Runner, Embedded PostgreSQL 16 |
+
+---
+
+## Directory Structure
+
+```
+ResolveAI_Nexconn/
+├── client/                     # Frontend Application
+│   ├── src/
+│   │   ├── components/         # Agent Dashboard, Chat Window, Widget, Storefront
+│   │   ├── data/               # Product catalogs, business rules, agent rosters
+│   │   ├── services/           # Nexconn SDK manager, API client, translation helpers
+│   │   └── App.jsx             # Router and application layout
+│   ├── package.json
+│   └── vite.config.js
+├── server/                     # Backend API Service
+│   ├── src/
+│   │   ├── db/                 # Connection pooling, migrations (001–005), seeding
+│   │   ├── middleware/         # Session authentication, CSRF, security headers
+│   │   ├── routes/             # Inbox, auth, agent availability, customer APIs
+│   │   ├── services/           # Outbox worker, capacity manager, conversation router
+│   │   └── server.js           # Server initialization and routes
+│   └── test/                   # Verification test suites
+├── docs/                       # Project documentation and submission artifacts
+├── screenshots/                # Comprehensive UI screenshots and captures
+└── README.md
+```
+
+---
+
+## Local Setup & Quick Start
 
 ### Prerequisites
-- **Node.js**: v18.0.0 or higher (v24+ verified)
-- **npm**: v9.0.0 or higher
-- **Google Chrome**: For running browser-based live E2E tests
+- Node.js (v18.0.0 or higher)
+- npm (v9.0.0 or higher)
+- PostgreSQL 16 (or local testing via embedded instance)
 
-### 1. Clone & Setup Environment
-```powershell
+### 1. Installation
+Clone the repository and install all dependencies:
+```bash
+git clone https://github.com/Rakshit414/ResolveAI_Nexconn.git
 cd ResolveAI_Nexconn
-
-# Copy environment template
-Copy-Item .env.example server\.env
-```
-*(Ensure `NEXCONN_APP_KEY`, `NEXCONN_APP_SECRET`, and `GEMINI_API_KEY` are provided in `server\.env`)*
-
-### 2. Install Dependencies
-```powershell
 npm install
-npm install --prefix server
-npm install --prefix client
+npm run build
 ```
 
-### 3. Launch Development Servers
-```powershell
-# Option A: Run both servers concurrently
+### 2. Environment Variables
+Create a `.env` file in the `server` directory:
+```env
+PORT=5000
+DATABASE_URL=postgresql://user:password@localhost:5432/resolve_ai
+NEXCONN_APP_KEY=your_nexconn_app_key
+NEXCONN_APP_SECRET=your_nexconn_app_secret
+GEMINI_API_KEY=your_gemini_api_key
+AGENT_JWT_SECRET=your_secure_jwt_secret
+```
+
+### 3. Database Migration
+Apply database schema migrations:
+```bash
+npm run db:migrate
+```
+
+### 4. Running the Development Server
+```bash
 npm run dev
-
-# Option B: Run in separate terminals
-# Terminal 1 (Backend API on port 5000):
-npm run server
-
-# Terminal 2 (Frontend Client on port 5173):
-npm run dev --prefix client
 ```
-
-- **Customer Portal**: `http://localhost:5173/customer`
-- **Agent Dashboard**: `http://localhost:5173/agent`
-- **Split-Screen Demo**: `http://localhost:5173/split`
-- **Backend Health Check**: `http://localhost:5000/api/health`
-
----
-
-## 🎬 Recommended Demonstration Sequence
-
-Follow this scripted sequence to demonstrate Resolve AI's capabilities to judges:
-
-### Phase 1: Dual-Pane Synchronization (`/split`)
-1. Open `http://localhost:5173/split`.
-2. Notice the side-by-side synchronized interface:
-   - **Left**: Customer Experience (Aarav Sharma — Order `#NC1021`).
-   - **Right**: Support Specialist Workspace (Sarah Lin).
-3. Type an inquiry in the Customer pane:
-   ```
-   "Where is my package? The tracking hasn't updated in 2 days."
-   ```
-4. Observe the message arrive instantly in the Agent pane via the live Nexconn WebSocket connection.
-
-### Phase 2: AI Copilot Assistance & Human Approval Gate
-1. On the Agent side, open the **AI Copilot** panel on the right.
-2. Observe real-time classification:
-   - **Category**: `Delivery Delay`
-   - **Priority**: `High`
-   - **Sentiment**: `Frustrated`
-3. View the structured 4-part summary:
-   - *What happened* | *What the customer needs* | *What was discussed* | *Pending action*
-4. Inspect the suggested response. Notice policy citations from NovaCart business rules (standard 4–6 business days delivery).
-5. Click **"Approve & Send"** (with built-in double-click lock).
-6. Verify the customer pane receives exactly one approved message.
-
-### Phase 3: Seamless Human Handoff
-1. Switch to **Priya Mehta** (Order `#NC1022` — Smartwatch Return).
-2. Notice initial status is `Status: AI Handling`.
-3. Click **"Request Human Support"**.
-4. Observe instant status change to Crimson Red: `Human Requested`.
-5. In the Agent pane, notice the alert banner and green **"Take Over"** button appear.
-6. Agent clicks **"Take Over"**.
-7. Observe customer status immediately update to `Sarah Lin Active`.
-8. AI autonomous messaging is suppressed—Sarah communicates directly with Priya.
-
-### Phase 4: Resolution & Persistence
-1. Agent clicks **"Resolve"** in the top action bar.
-2. Both agent and customer screens update to `Resolved`.
-3. Press `F5` on both panes to reload the page.
-4. Confirm that conversation history, active channels, and the `Resolved` state persist completely from the file-backed store.
+- Storefront & Widget: `http://localhost:5173/store`
+- Customer Portal: `http://localhost:5173/customer`
+- Agent Dashboard: `http://localhost:5173/agent`
+- Split-Screen Testing: `http://localhost:5173/split`
 
 ---
 
-## 🧪 Comprehensive Automated Test Suites
+## Test Verification Suites
 
-Resolve AI features 4 automated test suites covering security, unit messaging isolation, live API integrations, and headless browser end-to-end workflows:
+Resolve AI includes comprehensive test suites across unit, integration, localization, and security boundaries:
 
-```powershell
-# 1. Messaging Isolation & Deduplication Unit Suite (24/24 PASS)
-node client/test/messagingIsolation.test.js
+```bash
+# 1. Multi-Agent Workflow Integration (20 Verification Scenarios)
+node server/test/multiAgentWorkflow.test.js
 
-# 2. Server E2E & Live Gemini Failover Suite (11/11 PASS)
-node server/test/runE2ESuite.js
+# 2. Multi-Agent System Core Architecture & Invariants (11 Unit Tests)
+node server/test/multiAgentUnit.test.js
 
-# 3. Milestone 3 Complete Workflow Verification (24/24 PASS)
-node server/test/milestone3WorkflowVerification.js
+# 3. 12-Language Multilingual Localization & RTL Verification
+node server/test/twelveLanguageLocalization.test.js
 
-# 4. Milestone 4 Full 3-Customer Hardening Suite (37/37 PASS)
-node server/test/fullThreeCustomerE2E.js
+# 4. Storefront Cart Localization & Invariance Tests
+node server/test/storefrontLocalization.test.js
 
-# 5. Production Bundle Build (0 errors)
-npm run build --prefix client
+# 5. PostgreSQL Local Security Audit
+node server/test/pgShimsLocalSecurity.test.js
+
+# 6. Repository-Wide Security & Secrets Audit
+node server/test/securityAndSecretsScan.js
 ```
 
 ---
 
-## 🔒 Security Audit & Safeguards
+## Security & Operational Compliance
 
-| Security Requirement | Status | Implementation Detail |
-| :--- | :---: | :--- |
-| **Server-Side Secrets** | **VERIFIED** | `NEXCONN_APP_SECRET` and `GEMINI_API_KEY` are only read in Node.js server routes. They are never exposed in Vite bundles or client responses. |
-| **Git Exclusion** | **VERIFIED** | `.env`, `.env.local`, and data files are excluded in `.gitignore`. Zero secrets in git history. |
-| **Input Whitelist Validation** | **VERIFIED** | `PATCH /api/tickets/:id` strictly validates status against `['AI Handling', 'Human Requested', 'Human Agent Active', 'Resolved']` and priority against `['Critical', 'High', 'Medium', 'Low']`. |
-| **Cross-Customer Authorization** | **VERIFIED** | `GET /api/tickets/:id?customerId=...` returns HTTP 403 Forbidden if a customer attempts to query another customer's ticket. |
-| **DoS Payload Limiting** | **VERIFIED** | Large message payloads are bounded to 50 items and 2000 chars per message; Express payload limits return HTTP 413. |
-| **Protected Reset Endpoint** | **VERIFIED** | `POST /api/tickets/reset` is disabled in `NODE_ENV=production` unless `ALLOW_DEMO_RESET=true` is explicitly enabled. |
-
----
-
-## 💾 Persistence Architecture & Limitations
-
-### Architecture
-- **Disk Persistence**: `server/data/tickets.json` acts as the primary data store.
-- **Atomic Writes**: Writes utilize asynchronous temp-file creation (`tickets.tmp.<timestamp>.<rand>`) followed by atomic rename (`fs.promises.rename`), serialized via a mutex Promise queue to prevent file corruption and race conditions during concurrent requests.
-- **Client Fallback**: Local browser storage (`resolve_ai_ticket_statuses` & `resolve_ai_channel_history`) enables instant page hydration on reload, with timestamp-aware reconcilers ensuring newer backend records always take precedence over stale cache.
-
-### Known Limitations & Trade-offs
-1. **Single-Node Storage**: File-backed storage is designed for single-instance deployments (such as demo servers and containerized hackathon instances). Horizontal multi-node scaling would require migrating to PostgreSQL/Supabase.
-2. **Nexconn Broker Offline Message History**: Nexconn Singapore cloud brokers persist DirectChannel messages across sessions. Resolve AI incorporates client-side timestamp filtering (<30s window) to ensure historical broker messages do not regress fresh ticket states.
-3. **Gemini Free-Tier Rate Limits**: Free tier keys are subject to 20 RPM / 20 RPD limits. The server includes automatic failover (`gemini-3.5-flash` ➔ `gemini-3.5-flash-lite`) and rule-based fallback generation to ensure 100% demo continuity even when upstream rate limits are encountered.
-
----
-
-## 👥 Demo Personas & Dataset
-
-| Customer | Persona | Order ID | Product | Issue Category | Seed Status |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Aarav Sharma** | Frustrated shopper | `#NC1021` | NovaSprint Pro Shoes ($119.99) | Delivery Delay | `AI Handling` |
-| **Priya Mehta** | Return inquirer | `#NC1022` | NovaPulse Smartwatch ($249.50) | Refund Request | `AI Handling` |
-| **Kabir Verma** | Wrong item recipient | `#NC1023` | NovaBass ANC Headphones ($89.00) | Wrong Product | `AI Handling` |
-| **Sarah Lin** | Support Specialist | *All* | NovaCart Customer Care | Agent Operations | `Agent Workspace` |
-
-### One-Click Reset Procedure
-To reset all demo tickets and conversation states to their clean baseline at any time:
-```powershell
-# Send HTTP POST to the protected reset endpoint
-node -e "fetch('http://127.0.0.1:5000/api/tickets/reset', { method: 'POST' }).then(r => r.json()).then(console.log)"
-```
-Or simply click the reset button in test scripts.
+- **Authentication Precedence**: Bearer tokens are strictly evaluated before ambient cookies to prevent session confusion during agent switching.
+- **Row-Level Transaction Safety**: Database transfers derive ticket ownership from locked rows (`FOR UPDATE`) to prevent race conditions.
+- **Zero Hardcoded Secrets**: Client production assets and repository code are verified clean of credentials and private keys.

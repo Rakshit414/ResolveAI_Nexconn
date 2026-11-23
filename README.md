@@ -225,9 +225,6 @@ ResolveAI_Nexconn/
 │   │   ├── services/           # Capacity service, transactional outbox worker
 │   │   └── server.js           # Express app lifecycle
 │   └── test/                   # Comprehensive end-to-end and unit test suites
-├── docs/                       # Architecture and deployment documentation
-│   └── ORACLE_CLOUD_MIGRATION_GUIDE.md
-├── screenshots/                # High-resolution application screenshots
 └── README.md
 ```
 

@@ -15,7 +15,7 @@ An enterprise-grade omnichannel customer support and conversation routing system
 [![Gemini](https://img.shields.io/badge/Gemini_AI-1.5_Flash-8E75C2?style=for-the-badge&logo=googlegemini)](https://github.com/Rakshit414/ResolveAI_Nexconn)
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 
-[🌐 Live Deployment](https://resolve-ai-novacart.onrender.com) • [📄 Project Writeup PDF](docs/Resolve_AI_Nexconn_Project_Writeup.pdf) • [🎥 Demo Walkthrough](docs/demo_video_walkthrough_script.md)
+[🌐 Live Deployment](https://resolve-ai-novacart.onrender.com) • [📖 Architecture & Docs](#system-architecture) • [🧪 Test Verification](#test--verification-matrix)
 
 </div>
 
@@ -225,10 +225,8 @@ ResolveAI_Nexconn/
 │   │   ├── services/           # Capacity service, transactional outbox worker
 │   │   └── server.js           # Express app lifecycle
 │   └── test/                   # Comprehensive end-to-end and unit test suites
-├── docs/                       # Project writeups, compliance checklists, scripts
-│   ├── Resolve_AI_Nexconn_Project_Writeup.pdf
-│   ├── demo_video_walkthrough_script.md
-│   └── generate_writeup_pdf.py
+├── docs/                       # Architecture and deployment documentation
+│   └── ORACLE_CLOUD_MIGRATION_GUIDE.md
 ├── screenshots/                # High-resolution application screenshots
 └── README.md
 ```
